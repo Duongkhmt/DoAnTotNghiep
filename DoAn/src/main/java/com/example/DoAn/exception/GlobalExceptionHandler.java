@@ -1,0 +1,67 @@
+package com.example.DoAn.exception;
+
+import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
+import org.springframework.validation.ObjectError;
+import org.springframework.web.bind.MethodArgumentNotValidException;
+import org.springframework.web.bind.annotation.ExceptionHandler;
+import org.springframework.web.bind.annotation.RestControllerAdvice;
+
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+
+@RestControllerAdvice
+public class GlobalExceptionHandler {
+
+    @ExceptionHandler(RuntimeException.class)
+    public ResponseEntity<ErrorResponse> handleRuntimeException(RuntimeException ex) {
+        ErrorResponse errorResponse = ErrorResponse.builder()
+                .code(ErrorCode.UNCATEGORIZED_EXCEPTION.getCode()) // ← SỬA Ở ĐÂY
+                .message(ex.getMessage())
+                .status(HttpStatus.INTERNAL_SERVER_ERROR.value())
+                .build();
+
+        return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(errorResponse);
+    }
+
+    @ExceptionHandler(ApplicationException.class)
+    public ResponseEntity<ErrorResponse> handleApplicationException(ApplicationException ex) {
+        ErrorCode errorCode = ex.getErrorCode();
+        ErrorResponse errorResponse = ErrorResponse.builder()
+                .code(errorCode.getCode())
+                .message(errorCode.getMessage())
+                .status(errorCode.getHttpStatusCode().value())
+                .build();
+
+        return ResponseEntity.status(errorCode.getHttpStatusCode().value())
+                .body(errorResponse);
+    }
+
+    @ExceptionHandler(IllegalArgumentException.class)
+    public ResponseEntity<ErrorResponse> handleIllegalArgumentException(IllegalArgumentException ex) {
+        ErrorResponse errorResponse = ErrorResponse.builder()
+                .code(ErrorCode.INVALID_KEY.getCode())
+                .message(ex.getMessage())
+                .status(HttpStatus.BAD_REQUEST.value())
+                .build();
+
+        return ResponseEntity.badRequest().body(errorResponse);
+    }
+
+    @ExceptionHandler(MethodArgumentNotValidException.class)
+    public ResponseEntity<Map<String, Object>> handleValidationExceptions(MethodArgumentNotValidException ex) {
+        Map<String, Object> body = new HashMap<>();
+        body.put("code", 1234);
+        body.put("status", HttpStatus.BAD_REQUEST.value());
+        List<String> errorMessages = ex.getBindingResult()
+                .getAllErrors()
+                .stream()
+                .map(ObjectError::getDefaultMessage)
+                .toList();
+        body.put("message", errorMessages);
+        return ResponseEntity.badRequest().body(body);
+    }
+
+
+}
