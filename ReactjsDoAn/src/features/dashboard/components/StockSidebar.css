@@ -1,0 +1,154 @@
+.stock-sidebar {
+    width: 140px;
+    /* Thu nhỏ từ 160px xuống 140px */
+    background: rgba(255, 255, 255, 0.8);
+    backdrop-filter: blur(10px);
+    border-right: 1px solid #e2e8f0;
+    display: flex;
+    flex-direction: column;
+    padding: 1rem 0;
+    transition: width 0.3s ease;
+    position: relative;
+    height: 100%;
+}
+
+.stock-sidebar.collapsed {
+    width: 80px;
+}
+
+.sidebar-toggle-btn {
+    position: absolute;
+    top: 50%;
+    right: -14px;
+    transform: translateY(-50%);
+    width: 28px;
+    height: 28px;
+    background: #ffffff;
+    border: 1px solid #e2e8f0;
+    border-radius: 50%;
+    color: var(--text-color);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    z-index: 10;
+    transition: background 0.2s;
+}
+
+.sidebar-toggle-btn:hover {
+    background: #3b82f6;
+    border-color: #3b82f6;
+}
+
+.sidebar-container {
+    display: flex;
+    flex-direction: column;
+    flex: 1;
+    min-height: 0;
+    overflow: hidden;
+    padding: 0 1rem;
+}
+
+.sidebar-header {
+    min-height: 40px;
+    display: flex;
+    align-items: center;
+    margin-bottom: 0.5rem;
+    padding-bottom: 0.5rem;
+    border-bottom: 1px solid #e2e8f0;
+}
+
+.sidebar-header h3 {
+    margin: 0;
+    font-size: 0.95rem;
+    /* Hơi nhỏ tí ở tiêu đề Danh mục */
+    color: var(--text-color);
+    white-space: nowrap;
+}
+
+.sidebar-search {
+    position: relative;
+    margin-bottom: 1rem;
+    display: flex;
+    align-items: center;
+}
+
+.sidebar-search .search-icon {
+    position: absolute;
+    left: 10px;
+    color: #64748b;
+    font-size: 0.9rem;
+}
+
+.sidebar-search input {
+    width: 100%;
+    background: #ffffff;
+    border: 1px solid #cbd5e1;
+    border-radius: 6px;
+    padding: 0.5rem 0.2rem 0.5rem 1.6rem;
+    /* Nhích padding trái vào một chút */
+    /* Giảm padding trái phải một chút */
+    color: var(--text-color);
+    font-size: 0.75rem;
+    /* Chữ ô tìm kiếm nhỏ hơn xíu nữa */
+    /* Chữ ô tìm kiếm nhỏ lại */
+    outline: none;
+    transition: border-color 0.2s;
+}
+
+.sidebar-search input:focus {
+    border-color: #3b82f6;
+}
+
+.loading-text {
+    text-align: center;
+    padding: 1rem;
+    color: #64748b;
+    font-size: 0.85rem;
+    font-style: italic;
+}
+
+.symbols-list {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+    overflow-y: auto;
+    flex: 1;
+    padding-right: 0.25rem;
+}
+
+.symbol-btn {
+    background: transparent;
+    border: 1px solid #e2e8f0;
+    color: var(--text-color);
+    padding: 0.5rem 0.4rem;
+    /* Giảm padding các nút mã cổ phiếu thêm nữa */
+    /* Giảm padding các nút mã cổ phiếu */
+    border-radius: 6px;
+    /* Bo tròn ít đi để vừa vặn hơn */
+    font-size: 0.85rem;
+    /* Giảm cỡ chữ nút */
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.2s;
+    text-align: center;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.stock-sidebar.collapsed .symbol-btn {
+    padding: 0.75rem 0.25rem;
+}
+
+.symbol-btn:hover {
+    background: rgba(0, 0, 0, 0.05);
+    border-color: #cbd5e1;
+}
+
+.symbol-btn.active {
+    background: var(--primary-color);
+    border-color: var(--primary-hover);
+    color: white;
+    box-shadow: 0 4px 12px rgba(99, 102, 241, 0.4);
+}

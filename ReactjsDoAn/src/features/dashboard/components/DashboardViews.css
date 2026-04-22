@@ -1,0 +1,431 @@
+/* DashboardViews.css */
+
+.view-container {
+    padding: 1rem;
+    color: var(--text-color);
+}
+
+.view-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 1.5rem;
+}
+
+.view-header h2 {
+    margin: 0;
+    font-size: 1.25rem;
+    font-weight: 600;
+}
+
+.view-controls {
+    display: flex;
+    gap: 1rem;
+    align-items: center;
+}
+
+.search-box,
+.date-picker-box {
+    display: flex;
+    align-items: center;
+    background: #ffffff;
+    border: 1px solid #cbd5e1;
+    border-radius: 4px;
+    padding: 0.5rem 0.75rem;
+    gap: 0.5rem;
+}
+
+.search-box input,
+.date-picker-box input {
+    background: transparent;
+    border: none;
+    color: var(--text-color);
+    outline: none;
+    font-size: 0.875rem;
+}
+
+
+
+.search-box input::placeholder {
+    color: #71717a;
+}
+
+.chart-panel {
+    padding: 1.5rem;
+    margin-bottom: 1.5rem;
+    background: #ffffff;
+    border: 1px solid #e2e8f0;
+    border-radius: 12px;
+}
+
+.chart-title {
+    text-align: center;
+    margin-bottom: 1rem;
+    color: var(--text-color);
+}
+
+/* Settings Dropdown Button */
+.settings-dropdown-wrapper {
+    position: relative;
+    display: inline-block;
+}
+
+.settings-btn {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    background: #3b82f6;
+    color: white;
+    border: none;
+    padding: 0.5rem 1rem;
+    border-radius: 4px;
+    cursor: pointer;
+    font-weight: 500;
+    font-size: 0.875rem;
+    transition: background 0.2s;
+}
+
+.settings-btn:hover {
+    background: #2563eb;
+}
+
+/* Settings Menu Panel */
+.settings-menu {
+    position: absolute;
+    top: 100%;
+    right: 0;
+    margin-top: 0.5rem;
+    background: #ffffff;
+    border: 1px solid #e2e8f0;
+    border-radius: 8px;
+    padding: 0.5rem;
+    width: 260px;
+    max-height: 400px;
+    overflow-y: auto;
+    z-index: 100;
+    box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.1);
+}
+
+.settings-menu-item {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    padding: 0.5rem 0.75rem;
+    color: var(--text-color);
+    font-size: 0.875rem;
+    cursor: pointer;
+    border-radius: 4px;
+    transition: background 0.2s;
+}
+
+.settings-menu-item:hover {
+    background: #f1f5f9;
+}
+
+.settings-menu-item input[type="checkbox"] {
+    display: none;
+    /* Ẩn checkbox mặc định */
+}
+
+.checkbox-custom {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.1rem;
+}
+
+.text-muted {
+    color: #64748b;
+}
+
+.stats-panels-grid {
+    display: flex;
+    gap: 1.5rem;
+    overflow-x: auto;
+    padding-bottom: 0.5rem;
+}
+
+.stats-panels-grid::-webkit-scrollbar {
+    height: 8px;
+}
+
+.stats-panels-grid::-webkit-scrollbar-track {
+    background: #f1f5f9;
+    border-radius: 4px;
+}
+
+.stats-panels-grid::-webkit-scrollbar-thumb {
+    background: #cbd5e1;
+    border-radius: 4px;
+}
+
+.stats-panels-grid::-webkit-scrollbar-thumb:hover {
+    background: #94a3b8;
+}
+
+.stat-panel {
+    flex: 0 0 calc(33.333% - 1rem);
+    /* Hiển thị 3 cột, nếu nhỏ hơn thì kéo ngang */
+    min-width: 250px;
+    padding: 1.5rem;
+    background: #ffffff;
+    border: 1px solid #e2e8f0;
+    border-radius: 12px;
+}
+
+.stat-panel h4 {
+    margin-top: 0;
+    margin-bottom: 1rem;
+    border-bottom: 1px solid #e2e8f0;
+    padding-bottom: 0.5rem;
+    color: var(--text-color);
+}
+
+.stat-row {
+    display: flex;
+    justify-content: space-between;
+    margin-bottom: 0.5rem;
+    font-size: 0.875rem;
+}
+
+.stat-row span {
+    color: #64748b;
+}
+
+/* TABLE STYLES */
+.data-table-view {
+    padding: 0;
+    background: #ffffff;
+    border-radius: 8px;
+    border: 1px solid #e2e8f0;
+}
+
+.data-table-view .view-header {
+    padding: 1rem 1.5rem;
+    border-bottom: 1px solid #e2e8f0;
+    margin-bottom: 0;
+}
+
+.table-wrapper {
+    overflow-x: auto;
+    max-height: calc(100vh - 180px);
+    /* Tăng chiều cao danh sách hiển thị dữ liệu */
+}
+
+.custom-scrollbar::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+}
+
+.custom-scrollbar::-webkit-scrollbar-track {
+    background: #f1f5f9;
+}
+
+.custom-scrollbar::-webkit-scrollbar-thumb {
+    background: #cbd5e1;
+    border-radius: 4px;
+}
+
+.custom-scrollbar::-webkit-scrollbar-thumb:hover {
+    background: #94a3b8;
+}
+
+.financial-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.8rem;
+    white-space: nowrap;
+}
+
+.financial-table th,
+.financial-table td {
+    padding: 0.5rem 0.75rem;
+    border-bottom: 1px solid #e2e8f0;
+}
+
+.financial-table th {
+    background: #0ea5e9 !important;
+    /* Xanh da trời */
+    color: white;
+    /* Đổi màu chữ chữ thành trắng cho dễ đọc trên nền xanh */
+    position: sticky;
+    top: 0;
+    z-index: 10;
+    font-weight: 600;
+    text-align: right;
+    border-bottom: 2px solid #3b82f6;
+}
+
+.financial-table th:first-child,
+.financial-table td:first-child {
+    text-align: left;
+    position: sticky;
+    left: 0;
+    z-index: 11;
+}
+
+.financial-table th:first-child {
+    background: #0ea5e9 !important;
+}
+
+.financial-table td:first-child {
+    background: #ffffff;
+}
+
+.financial-table tbody tr:hover td {
+    background: #f1f5f9;
+}
+
+/* Utilities */
+.text-right {
+    text-align: right;
+}
+
+.text-center {
+    text-align: center;
+}
+
+.font-bold {
+    font-weight: bold;
+}
+
+.text-yellow {
+    color: #eab308;
+}
+
+.text-green {
+    color: #22c55e;
+}
+
+.text-red {
+    color: #ef4444;
+}
+
+.text-blue {
+    color: #3b82f6;
+}
+
+.text-purple {
+    color: #a855f7;
+}
+
+.bg-red-ratio {
+    background-color: #ef4444 !important;
+    color: white !important;
+}
+
+.bg-yellow-ratio {
+    background-color: #ca8a04 !important;
+    color: white !important;
+}
+
+.bg-green-ratio {
+    background-color: #16a34a !important;
+    color: white !important;
+}
+
+.bg-olive-ratio {
+    background-color: #65a30d !important;
+    color: white !important;
+}
+
+.bg-green-net {
+    background-color: #16a34a !important;
+    color: white !important;
+}
+
+.bg-red-net {
+    background-color: #dc2626 !important;
+    color: white !important;
+}
+
+.bg-purple-dark {
+    background-color: #6b21a8 !important;
+    color: white !important;
+}
+
+.highlight-col {
+    background: #f8fafc;
+}
+
+.group-start {
+    border-left: 2px solid #e2e8f0;
+}
+
+/* Custom Table Column Backgrounds */
+.financial-table th.bg-col-group1,
+.financial-table td.bg-col-group1 {
+    background-color: #e0f2fe;
+}
+
+.financial-table th.bg-col-white,
+.financial-table td.bg-col-white {
+    background-color: #ffffff;
+}
+
+.financial-table th.bg-col-group2,
+.financial-table td.bg-col-group2 {
+    background-color: #fef08a;
+    /* Light yellow background */
+}
+
+
+/* Grouped Table (Mua Bán Khối) */
+.grouped-header-table th {
+    text-align: center;
+    border: 1px solid #e2e8f0;
+}
+
+.header-buy {
+    color: #16a34a;
+}
+
+.header-sell {
+    color: #dc2626;
+}
+
+.header-net {
+    color: #2563eb;
+}
+
+.header-foreign {
+    background: #e0f2fe;
+    color: #0369a1 !important;
+}
+
+.header-matched {
+    background: #dbeafe;
+    color: #1d4ed8 !important;
+}
+
+/* Dashboard Tabs */
+.dashboard-nav-tabs {
+    display: flex;
+    gap: 1rem;
+    padding: 0 1.5rem;
+    margin-bottom: 1.5rem;
+    border-bottom: 1px solid #e2e8f0;
+    overflow-x: auto;
+}
+
+.tab-btn {
+    background: none;
+    border: none;
+    color: #64748b;
+    padding: 0.75rem 1rem;
+    font-size: 0.875rem;
+    cursor: pointer;
+    border-bottom: 2px solid transparent;
+    transition: all 0.2s;
+    white-space: nowrap;
+}
+
+.tab-btn:hover {
+    color: #0f172a;
+}
+
+.tab-btn.active {
+    color: #3b82f6;
+    border-bottom-color: #3b82f6;
+    font-weight: 600;
+}
