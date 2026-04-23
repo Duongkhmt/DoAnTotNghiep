@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useAuth } from '../../../contexts/AuthContext';
-import { FiX, FiGithub, FiMail, FiLock, FiUser, FiPhone, FiMapPin } from 'react-icons/fi';
+import { FiX, FiMail, FiLock, FiUser, FiPhone, FiMapPin } from 'react-icons/fi';
 import { FcGoogle } from 'react-icons/fc';
 import './AuthModal.css';
 
@@ -43,7 +43,7 @@ const AuthModal = ({ isOpen, onClose, initialMode = 'login' }) => {
         try {
             if (isLogin) {
                 await login(formData.email, formData.password);
-                onClose(); // Close modal on success
+                onClose();
             } else {
                 await register(
                     formData.username,
@@ -52,20 +52,18 @@ const AuthModal = ({ isOpen, onClose, initialMode = 'login' }) => {
                     formData.phoneNumber,
                     formData.address
                 );
-                // Switch to login after successful register
                 setIsLogin(true);
-                setError('Registration successful! Please sign in.');
+                setError('Đăng ký thành công. Hãy đăng nhập.');
             }
         } catch (err) {
-            setError(err.response?.data?.message || 'An error occurred. Please try again.');
+            setError(err.response?.data?.message || err.response?.data?.error || 'Đăng nhập thất bại. Vui lòng thử lại.');
         } finally {
             setLoading(false);
         }
     };
 
     const handleGoogleLogin = () => {
-        // Gọi thẳng vào luồng filter chuẩn của Spring Security
-        window.location.href = 'http://localhost:8080/oauth2/authorization/google';
+        window.location.href = 'http://localhost:8082/oauth2/authorization/google';
     };
 
     return (
@@ -80,11 +78,7 @@ const AuthModal = ({ isOpen, onClose, initialMode = 'login' }) => {
                     <p>{isLogin ? 'Sign in to access your dashboard' : 'Join us to get started'}</p>
                 </div>
 
-                {error && (
-                    <div className="error-message">
-                        {error}
-                    </div>
-                )}
+                {error && <div className="error-message">{error}</div>}
 
                 <form onSubmit={handleSubmit} className="auth-form">
                     {!isLogin && (
@@ -131,7 +125,7 @@ const AuthModal = ({ isOpen, onClose, initialMode = 'login' }) => {
                                 value={formData.password}
                                 onChange={handleChange}
                                 className="input-field"
-                                placeholder="••••••••"
+                                placeholder="********"
                                 required
                                 minLength={8}
                             />
@@ -187,7 +181,7 @@ const AuthModal = ({ isOpen, onClose, initialMode = 'login' }) => {
                 </div>
 
                 <div className="auth-footer">
-                    {isLogin ? "Don't have an account? " : "Already have an account? "}
+                    {isLogin ? "Don't have an account? " : 'Already have an account? '}
                     <span
                         className="toggle-auth"
                         onClick={() => {

@@ -2,14 +2,14 @@
     min-height: 100vh;
     display: flex;
     flex-direction: column;
+    background:
+        radial-gradient(circle at top left, rgba(29, 78, 216, 0.08), transparent 20%),
+        radial-gradient(circle at right top, rgba(234, 88, 12, 0.08), transparent 22%);
 }
 
 .dashboard-content {
     flex: 1;
-    padding: 1rem;
-    /* Giảm padding một chút để không lãng phí không gian */
     width: 100%;
-    /* max-width: 1200px; - Đã xoá bỏ giới hạn chiều rộng để xài full màn hình */
 }
 
 .dashboard-header {
@@ -153,6 +153,38 @@
 
 .positive {
     color: var(--success-color);
+}
+
+.dashboard-nav-tabs {
+    display: flex;
+    gap: 0.65rem;
+    padding: 0.25rem 1.5rem 0;
+    margin-bottom: 1rem;
+    overflow-x: auto;
+}
+
+.tab-btn {
+    background: rgba(255, 255, 255, 0.72);
+    border: 1px solid rgba(215, 222, 231, 0.9);
+    color: #475569;
+    padding: 0.75rem 1.05rem;
+    font-size: 0.9rem;
+    border-radius: 999px;
+    transition: all 0.2s ease;
+    white-space: nowrap;
+    box-shadow: 0 10px 20px rgba(15, 23, 42, 0.04);
+}
+
+.tab-btn:hover {
+    color: #0f172a;
+    transform: translateY(-1px);
+}
+
+.tab-btn.active {
+    color: white;
+    background: linear-gradient(135deg, #1d4ed8, #0f766e);
+    border-color: transparent;
+    font-weight: 600;
 }
 
 @media (max-width: 900px) {

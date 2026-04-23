@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import { format } from 'date-fns';
 import { FiClock, FiExternalLink } from 'react-icons/fi';
 import newsService from '../services/news.service';
@@ -17,8 +17,8 @@ const NewsSection = () => {
                 setNews(data || []);
                 setError(null);
             } catch (err) {
-                console.error("Error fetching news:", err);
-                setError("Failed to load news. Please try again later.");
+                console.error('Error fetching news:', err);
+                setError('Không thể tải tin tức. Vui lòng thử lại sau.');
             } finally {
                 setLoading(false);
             }
@@ -41,7 +41,7 @@ const NewsSection = () => {
 
     return (
         <div className="news-section">
-            <h2 className="news-header">Tin tức Thị trường Chứng khoán</h2>
+            <h2 className="news-header">Tin tức thị trường chứng khoán</h2>
             <div className="news-grid">
                 {news.map((article, index) => (
                     <a
@@ -67,7 +67,7 @@ const NewsSection = () => {
                             <div className="news-footer">
                                 <span className="news-date">
                                     <FiClock className="icon" />
-                                    {article.pubDate ? format(new Date(article.pubDate), 'dd/MM/yyyy HH:mm') : 'Unknown time'}
+                                    {article.pubDate ? format(new Date(article.pubDate), 'dd/MM/yyyy HH:mm') : 'Không rõ thời gian'}
                                 </span>
                                 <span className="news-read-more">
                                     Đọc tiếp <FiExternalLink className="icon" />
