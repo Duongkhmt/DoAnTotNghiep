@@ -13,6 +13,14 @@ class NewsService {
     getStockNews() {
         return api.get('/news/stock').then(res => res.data);
     }
+
+    getNewsDetail(url) {
+        return api.get(`/news/detail?url=${encodeURIComponent(url)}`).then(res => res.data);
+    }
+
+    summarizeNews(url) {
+        return api.get(`/news/summarize?url=${encodeURIComponent(url)}`).then(res => res.data);
+    }
 }
 
 export default new NewsService();

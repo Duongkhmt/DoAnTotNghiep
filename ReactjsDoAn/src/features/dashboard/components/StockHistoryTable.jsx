@@ -7,23 +7,23 @@ import './DashboardViews.css';
 const ALL_COLUMNS = [
     { id: 'symbol', label: 'Mã cổ phiếu', defaultVisible: true },
     { id: 'tradeDate', label: 'Ngày giao dịch', defaultVisible: true },
-    { id: 'totalVolume', label: 'Khối lượng khớp', defaultVisible: true },
-    { id: 'buyOrderVolume', label: 'KL đặt mua', defaultVisible: true },
-    { id: 'sellOrderVolume', label: 'KL đặt bán', defaultVisible: true },
-    { id: 'avgBuyOrderVolume', label: 'KLTB đặt mua', defaultVisible: true },
-    { id: 'avgSellOrderVolume', label: 'KLTB đặt bán', defaultVisible: true },
+    { id: 'totalValue', label: 'Giá trị khớp', defaultVisible: true },
+    { id: 'buyOrderValue', label: 'GT đặt mua', defaultVisible: true },
+    { id: 'sellOrderValue', label: 'GT đặt bán', defaultVisible: true },
+    { id: 'avgBuyOrderVolume', label: 'GT TB đặt mua', defaultVisible: true },
+    { id: 'avgSellOrderVolume', label: 'GT TB đặt bán', defaultVisible: true },
     { id: 'orderRatio', label: 'Hệ số TB đặt bán/mua', defaultVisible: true },
-    { id: 'activeBuyVolume', label: 'KL khớp mua', defaultVisible: true },
-    { id: 'activeSellVolume', label: 'KL khớp bán', defaultVisible: true },
-    { id: 'avgMatchedBuy', label: 'KLTB khớp mua', defaultVisible: true },
-    { id: 'avgMatchedSell', label: 'KLTB khớp bán', defaultVisible: true },
+    { id: 'activeBuyValue', label: 'GT khớp mua', defaultVisible: true },
+    { id: 'activeSellValue', label: 'GT khớp bán', defaultVisible: true },
+    { id: 'avgMatchedBuy', label: 'GT TB khớp mua', defaultVisible: true },
+    { id: 'avgMatchedSell', label: 'GT TB khớp bán', defaultVisible: true },
     { id: 'matchedRatio', label: 'Hệ số khớp bán/mua', defaultVisible: true },
-    { id: 'foreignBuyVolume', label: 'KL NN mua', defaultVisible: true },
-    { id: 'foreignSellVolume', label: 'KL NN bán', defaultVisible: true },
-    { id: 'cancelBuyVolume', label: 'KL hủy mua', defaultVisible: true },
-    { id: 'cancelSellVolume', label: 'KL hủy bán', defaultVisible: true },
-    { id: 'avgCancelBuy', label: 'KLTB hủy mua', defaultVisible: true },
-    { id: 'avgCancelSell', label: 'KLTB hủy bán', defaultVisible: true }
+    { id: 'foreignBuyVal', label: 'GT NN mua', defaultVisible: true },
+    { id: 'foreignSellVal', label: 'GT NN bán', defaultVisible: true },
+    { id: 'cancelBuyValue', label: 'GT hủy mua', defaultVisible: true },
+    { id: 'cancelSellValue', label: 'GT hủy bán', defaultVisible: true },
+    { id: 'avgCancelBuy', label: 'GT TB hủy mua', defaultVisible: true },
+    { id: 'avgCancelSell', label: 'GT TB hủy bán', defaultVisible: true }
 ];
 
 const StockHistoryTable = ({ symbol, date, onSymbolChange, onDateChange }) => {
@@ -48,7 +48,8 @@ const StockHistoryTable = ({ symbol, date, onSymbolChange, onDateChange }) => {
                 const result = date
                     ? await marketService.getStockHistoryByDateRange(symbol, '2000-01-01', date)
                     : await marketService.getStockHistory(symbol);
-                setData(result);
+                const sortedResult = [...(result || [])].sort((a, b) => new Date(b.tradeDate).getTime() - new Date(a.tradeDate).getTime());
+                setData(sortedResult);
             } catch (error) {
                 console.error('Error fetching stock history:', error);
                 setData([]);
@@ -150,23 +151,23 @@ const StockHistoryTable = ({ symbol, date, onSymbolChange, onDateChange }) => {
                             <tr>
                                 {visibleColumns.symbol && <th className="bg-col-white">Mã CP</th>}
                                 {visibleColumns.tradeDate && <th className="bg-col-white">Ngày GD</th>}
-                                {visibleColumns.totalVolume && <th className="bg-col-group1">Khối lượng khớp</th>}
-                                {visibleColumns.buyOrderVolume && <th className="bg-col-group2">KL đặt mua</th>}
-                                {visibleColumns.sellOrderVolume && <th className="bg-col-group2">KL đặt bán</th>}
-                                {visibleColumns.avgBuyOrderVolume && <th className="bg-col-group2">KLTB đặt mua</th>}
-                                {visibleColumns.avgSellOrderVolume && <th className="bg-col-group2">KLTB đặt bán</th>}
+                                {visibleColumns.totalValue && <th className="bg-col-group1">Giá trị khớp</th>}
+                                {visibleColumns.buyOrderValue && <th className="bg-col-group2">GT đặt mua</th>}
+                                {visibleColumns.sellOrderValue && <th className="bg-col-group2">GT đặt bán</th>}
+                                {visibleColumns.avgBuyOrderVolume && <th className="bg-col-group2">GT TB đặt mua</th>}
+                                {visibleColumns.avgSellOrderVolume && <th className="bg-col-group2">GT TB đặt bán</th>}
                                 {visibleColumns.orderRatio && <th className="bg-col-group2 highlight-col">Hệ số TB đặt bán/mua</th>}
-                                {visibleColumns.activeBuyVolume && <th className="bg-col-group2">KL khớp mua</th>}
-                                {visibleColumns.activeSellVolume && <th className="bg-col-group1">KL khớp bán</th>}
-                                {visibleColumns.avgMatchedBuy && <th className="bg-col-group1">KLTB khớp mua</th>}
-                                {visibleColumns.avgMatchedSell && <th className="bg-col-group1">KLTB khớp bán</th>}
+                                {visibleColumns.activeBuyValue && <th className="bg-col-group2">GT khớp mua</th>}
+                                {visibleColumns.activeSellValue && <th className="bg-col-group1">GT khớp bán</th>}
+                                {visibleColumns.avgMatchedBuy && <th className="bg-col-group1">GT TB khớp mua</th>}
+                                {visibleColumns.avgMatchedSell && <th className="bg-col-group1">GT TB khớp bán</th>}
                                 {visibleColumns.matchedRatio && <th className="bg-col-group2 highlight-col">Hệ số khớp bán/mua</th>}
-                                {visibleColumns.foreignBuyVolume && <th className="bg-col-group1">KL NN mua</th>}
-                                {visibleColumns.foreignSellVolume && <th className="bg-col-group2">KL NN bán</th>}
-                                {visibleColumns.cancelBuyVolume && <th className="bg-col-group2">KL hủy mua</th>}
-                                {visibleColumns.cancelSellVolume && <th className="bg-col-group2">KL hủy bán</th>}
-                                {visibleColumns.avgCancelBuy && <th className="bg-col-group2">KLTB hủy mua</th>}
-                                {visibleColumns.avgCancelSell && <th className="bg-col-group2">KLTB hủy bán</th>}
+                                {visibleColumns.foreignBuyVal && <th className="bg-col-group1">GT NN mua</th>}
+                                {visibleColumns.foreignSellVal && <th className="bg-col-group2">GT NN bán</th>}
+                                {visibleColumns.cancelBuyValue && <th className="bg-col-group2">GT hủy mua</th>}
+                                {visibleColumns.cancelSellValue && <th className="bg-col-group2">GT hủy bán</th>}
+                                {visibleColumns.avgCancelBuy && <th className="bg-col-group2">GT TB hủy mua</th>}
+                                {visibleColumns.avgCancelSell && <th className="bg-col-group2">GT TB hủy bán</th>}
                             </tr>
                         </thead>
                         <tbody>
@@ -178,9 +179,9 @@ const StockHistoryTable = ({ symbol, date, onSymbolChange, onDateChange }) => {
                                             {row.tradeDate ? format(parseISO(row.tradeDate), 'yyyy-MM-dd') : '-'}
                                         </td>
                                     )}
-                                    {visibleColumns.totalVolume && <td className="text-right font-bold bg-col-group1">{fmtNum(row.totalVolume)}</td>}
-                                    {visibleColumns.buyOrderVolume && <td className="text-right bg-col-group2">{fmtNum(row.buyOrderVolume)}</td>}
-                                    {visibleColumns.sellOrderVolume && <td className="text-right bg-col-group2">{fmtNum(row.sellOrderVolume)}</td>}
+                                    {visibleColumns.totalValue && <td className="text-right font-bold bg-col-group1">{fmtNum(row.totalValue)}</td>}
+                                    {visibleColumns.buyOrderValue && <td className="text-right bg-col-group2">{fmtNum(row.buyOrderValue)}</td>}
+                                    {visibleColumns.sellOrderValue && <td className="text-right bg-col-group2">{fmtNum(row.sellOrderValue)}</td>}
                                     {visibleColumns.avgBuyOrderVolume && <td className="text-right bg-col-group2">{fmtNum(row.avgBuyOrderVolume)}</td>}
                                     {visibleColumns.avgSellOrderVolume && <td className="text-right bg-col-group2">{fmtNum(row.avgSellOrderVolume)}</td>}
                                     {visibleColumns.orderRatio && (
@@ -188,8 +189,8 @@ const StockHistoryTable = ({ symbol, date, onSymbolChange, onDateChange }) => {
                                             {row.orderRatio !== null && row.orderRatio !== undefined ? Number(row.orderRatio).toFixed(2) : '-'}
                                         </td>
                                     )}
-                                    {visibleColumns.activeBuyVolume && <td className="text-right bg-col-group2">{fmtNum(row.activeBuyVolume)}</td>}
-                                    {visibleColumns.activeSellVolume && <td className="text-right bg-col-group1">{fmtNum(row.activeSellVolume)}</td>}
+                                    {visibleColumns.activeBuyValue && <td className="text-right bg-col-group2">{fmtNum(row.activeBuyValue)}</td>}
+                                    {visibleColumns.activeSellValue && <td className="text-right bg-col-group1">{fmtNum(row.activeSellValue)}</td>}
                                     {visibleColumns.avgMatchedBuy && <td className="text-right bg-col-group1">{fmtNum(row.avgMatchedBuy)}</td>}
                                     {visibleColumns.avgMatchedSell && <td className="text-right bg-col-group1">{fmtNum(row.avgMatchedSell)}</td>}
                                     {visibleColumns.matchedRatio && (
@@ -197,10 +198,10 @@ const StockHistoryTable = ({ symbol, date, onSymbolChange, onDateChange }) => {
                                             {row.matchedRatio !== null && row.matchedRatio !== undefined ? Number(row.matchedRatio).toFixed(2) : '-'}
                                         </td>
                                     )}
-                                    {visibleColumns.foreignBuyVolume && <td className="text-right bg-col-group1">{fmtNum(row.foreignBuyVolume)}</td>}
-                                    {visibleColumns.foreignSellVolume && <td className="text-right bg-col-group2">{fmtNum(row.foreignSellVolume)}</td>}
-                                    {visibleColumns.cancelBuyVolume && <td className="text-right bg-col-group2">{fmtNum(row.cancelBuyVolume)}</td>}
-                                    {visibleColumns.cancelSellVolume && <td className="text-right bg-col-group2">{fmtNum(row.cancelSellVolume)}</td>}
+                                    {visibleColumns.foreignBuyVal && <td className="text-right bg-col-group1">{fmtNum(row.foreignBuyVal)}</td>}
+                                    {visibleColumns.foreignSellVal && <td className="text-right bg-col-group2">{fmtNum(row.foreignSellVal)}</td>}
+                                    {visibleColumns.cancelBuyValue && <td className="text-right bg-col-group2">{fmtNum(row.cancelBuyValue)}</td>}
+                                    {visibleColumns.cancelSellValue && <td className="text-right bg-col-group2">{fmtNum(row.cancelSellValue)}</td>}
                                     {visibleColumns.avgCancelBuy && <td className="text-right bg-col-group2">{fmtNum(row.avgCancelBuy)}</td>}
                                     {visibleColumns.avgCancelSell && <td className="text-right bg-col-group2">{fmtNum(row.avgCancelSell)}</td>}
                                 </tr>

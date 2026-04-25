@@ -34,6 +34,6 @@ public class MarketService {
         if (startDate == null || endDate == null || startDate.isAfter(endDate)) {
             throw new ApplicationException(ErrorCode.INVALID_KEY);
         }
-        return timescaleMarketRepository.findStockHistory(symbol.toUpperCase(), startDate, endDate, false);
+        return timescaleMarketRepository.findStockHistory(symbol.toUpperCase(), startDate, endDate, true);
     }
 }

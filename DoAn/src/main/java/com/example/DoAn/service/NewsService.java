@@ -22,6 +22,12 @@ import java.util.regex.Pattern;
 @Service
 public class NewsService {
 
+    private final GeminiService geminiService;
+
+    public NewsService(GeminiService geminiService) {
+        this.geminiService = geminiService;
+    }
+
     // nhiều nguồn tin
     private static final String VNEXPRESS = "https://vnexpress.net/rss/kinh-doanh/chung-khoan.rss";
     private static final String CAFEF = "https://cafef.vn/thi-truong-chung-khoan.rss";
@@ -36,6 +42,44 @@ public class NewsService {
         articles.addAll(fetchRSS(VIETSTOCK));
 
         return articles;
+    }
+
+    public String scrapeContent(String url) {
+        try {
+            org.jsoup.nodes.Document doc = org.jsoup.Jsoup.connect(url)
+                    .userAgent("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36")
+                    .timeout(10000)
+                    .get();
+
+            String[] selectors = {
+                    "article.fck_detail", // VnExpress
+                    "div.content_detail", // CafeF
+                    "div.article-content", // VietStock
+                    "div.post-content",
+                    "div.detail-content",
+                    ".content"
+            };
+
+            for (String selector : selectors) {
+                org.jsoup.select.Elements elements = doc.select(selector);
+                if (!elements.isEmpty()) {
+                    return elements.text();
+                }
+            }
+            return doc.body().text();
+        } catch (Exception e) {
+            log.error("Scraping error from {} : {}", url, e.getMessage());
+            return null;
+        }
+    }
+
+    public String summarizeArticle(String url) {
+        String content = scrapeContent(url);
+        if (content == null || content.length() < 100) {
+            return "Không thể lấy nội dung bài báo để tóm tắt.";
+        }
+        String truncatedContent = content.length() > 5000 ? content.substring(0, 5000) : content;
+        return geminiService.summarize(truncatedContent);
     }
 
     private List<NewsArticleDTO> fetchRSS(String rssUrl) {

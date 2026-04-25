@@ -23,4 +23,14 @@ public class NewsController {
     public ResponseEntity<List<NewsArticleDTO>> getStockNews() {
         return ResponseEntity.ok(newsService.getStockMarketNews());
     }
+
+    @GetMapping("/detail")
+    public ResponseEntity<String> getNewsDetail(@org.springframework.web.bind.annotation.RequestParam String url) {
+        return ResponseEntity.ok(newsService.scrapeContent(url));
+    }
+
+    @GetMapping("/summarize")
+    public ResponseEntity<String> summarizeNews(@org.springframework.web.bind.annotation.RequestParam String url) {
+        return ResponseEntity.ok(newsService.summarizeArticle(url));
+    }
 }

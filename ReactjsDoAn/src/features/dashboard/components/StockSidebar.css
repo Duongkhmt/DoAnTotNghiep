@@ -1,6 +1,5 @@
 .stock-sidebar {
     width: 140px;
-    /* Thu nhỏ từ 160px xuống 140px */
     background: rgba(255, 255, 255, 0.8);
     backdrop-filter: blur(10px);
     border-right: 1px solid #e2e8f0;
@@ -114,6 +113,7 @@
     gap: 0.5rem;
     overflow-y: auto;
     flex: 1;
+    min-height: 0;
     padding-right: 0.25rem;
 }
 
@@ -121,20 +121,18 @@
     background: transparent;
     border: 1px solid #e2e8f0;
     color: var(--text-color);
-    padding: 0.5rem 0.4rem;
-    /* Giảm padding các nút mã cổ phiếu thêm nữa */
-    /* Giảm padding các nút mã cổ phiếu */
+    padding: 0.65rem 0.4rem;
     border-radius: 6px;
-    /* Bo tròn ít đi để vừa vặn hơn */
     font-size: 0.85rem;
-    /* Giảm cỡ chữ nút */
-    font-weight: 500;
+    font-weight: 600;
     cursor: pointer;
     transition: all 0.2s;
     text-align: center;
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
+    flex-shrink: 0; /* Prevent squashing */
+    min-height: 36px;
 }
 
 .stock-sidebar.collapsed .symbol-btn {

@@ -42,20 +42,34 @@ public class TimescaleMarketRepository {
     }
 
     public List<StockResponseDTO> findAllStocks() {
+        String sql = STOCK_BASE_SQL + """
+                LEFT JOIN (
+                    SELECT DISTINCT ON (symbol) symbol, volume
+                    FROM quote_history
+                    ORDER BY symbol, trading_date DESC
+                ) q ON q.symbol = l.symbol
+                ORDER BY q.volume DESC NULLS LAST, l.symbol ASC
+                """;
         return jdbcTemplate.query(
-                STOCK_BASE_SQL + " ORDER BY l.symbol ASC",
+                sql,
                 new MapSqlParameterSource(),
                 (rs, rowNum) -> mapStock(rs)
         );
     }
 
     public List<StockResponseDTO> searchStocks(String keyword) {
+        String sql = STOCK_BASE_SQL + """
+                LEFT JOIN (
+                    SELECT DISTINCT ON (symbol) symbol, volume
+                    FROM quote_history
+                    ORDER BY symbol, trading_date DESC
+                ) q ON q.symbol = l.symbol
+                WHERE LOWER(l.symbol) LIKE LOWER(:keyword)
+                   OR LOWER(COALESCE(c.name, l.organ_name, '')) LIKE LOWER(:keyword)
+                ORDER BY q.volume DESC NULLS LAST, l.symbol ASC
+                """;
         return jdbcTemplate.query(
-                STOCK_BASE_SQL + """
-                         WHERE LOWER(l.symbol) LIKE LOWER(:keyword)
-                            OR LOWER(COALESCE(c.name, l.organ_name, '')) LIKE LOWER(:keyword)
-                         ORDER BY l.symbol ASC
-                        """,
+                sql,
                 new MapSqlParameterSource("keyword", "%" + keyword + "%"),
                 (rs, rowNum) -> mapStock(rs)
         );
@@ -75,21 +89,21 @@ public class TimescaleMarketRepository {
                 SELECT
                     q.symbol,
                     q.trading_date,
-                    q.volume,
+                    q.turnover AS value,
                     q.close,
-                    dos.buy_volume,
-                    dos.sell_volume,
+                    dos.buy_volume AS buy_value,
+                    dos.sell_volume AS sell_value,
                     dos.avg_buy_order,
                     dos.avg_sell_order,
                     dos.ratio_sell_buy_order,
-                    dos.matched_buy_volume,
-                    dos.matched_sell_volume,
-                    dos.cancel_buy_volume,
-                    dos.cancel_sell_volume,
-                    t.fr_buy_volume,
-                    t.fr_sell_volume,
-                    t.prop_buy_volume,
-                    t.prop_sell_volume,
+                    dos.matched_buy_volume AS matched_buy_value,
+                    dos.matched_sell_volume AS matched_sell_value,
+                    dos.cancel_buy_volume AS cancel_buy_value,
+                    dos.cancel_sell_volume AS cancel_sell_value,
+                    t.fr_buy_value,
+                    t.fr_sell_value,
+                    t.prop_buy_value,
+                    t.prop_sell_value,
                     dv.pe,
                     dv.pb
                 FROM quote_history q
@@ -104,10 +118,8 @@ public class TimescaleMarketRepository {
                    AND dv.trading_date = q.trading_date
                 WHERE q.symbol = :symbol
                   AND q.trading_date BETWEEN :startDate AND :endDate
-                ORDER BY q.trading_date
-                """;
-
-        sql += descending ? " DESC" : " ASC";
+                ORDER BY q.trading_date %s
+                """.formatted(descending ? "DESC" : "ASC");
 
         MapSqlParameterSource params = new MapSqlParameterSource()
                 .addValue("symbol", symbol)
@@ -233,27 +245,27 @@ public class TimescaleMarketRepository {
                         SELECT
                             q.symbol,
                             q.trading_date,
-                            t.fr_buy_volume,
-                            t.fr_sell_volume,
-                            t.prop_buy_volume,
-                            t.prop_sell_volume
+                            t.fr_buy_value,
+                            t.fr_sell_value,
+                            t.prop_buy_value,
+                            t.prop_sell_value
                         FROM quote_history q
                         LEFT JOIN trading t
                             ON t.symbol = q.symbol
                            AND t.trading_date = q.trading_date
                         WHERE q.symbol = :symbol
                           AND q.trading_date BETWEEN :startDate AND :endDate
-                        ORDER BY q.trading_date ASC
+                        ORDER BY q.trading_date DESC
                         """,
                 new MapSqlParameterSource()
                         .addValue("symbol", symbol)
                         .addValue("startDate", startDate)
                         .addValue("endDate", endDate),
                 (rs, rowNum) -> {
-                    BigDecimal foreignBuy = defaultZero(getBigDecimal(rs, "fr_buy_volume"));
-                    BigDecimal foreignSell = defaultZero(getBigDecimal(rs, "fr_sell_volume"));
-                    BigDecimal propBuy = defaultZero(getBigDecimal(rs, "prop_buy_volume"));
-                    BigDecimal propSell = defaultZero(getBigDecimal(rs, "prop_sell_volume"));
+                    BigDecimal foreignBuy = defaultZero(getBigDecimal(rs, "fr_buy_value"));
+                    BigDecimal foreignSell = defaultZero(getBigDecimal(rs, "fr_sell_value"));
+                    BigDecimal propBuy = defaultZero(getBigDecimal(rs, "prop_buy_value"));
+                    BigDecimal propSell = defaultZero(getBigDecimal(rs, "prop_sell_value"));
 
                     return ForeignTradingDTO.builder()
                             .symbol(rs.getString("symbol"))
@@ -264,24 +276,24 @@ public class TimescaleMarketRepository {
                             .tdMua(propBuy)
                             .tdBan(propSell)
                             .tdRong(propBuy.subtract(propSell))
-                            .cnMua(BigDecimal.ZERO)
-                            .cnBan(BigDecimal.ZERO)
-                            .cnRong(BigDecimal.ZERO)
-                            .tcMua(BigDecimal.ZERO)
-                            .tcBan(BigDecimal.ZERO)
-                            .tcRong(BigDecimal.ZERO)
+                            .cnMua(null)
+                            .cnBan(null)
+                            .cnRong(null)
+                            .tcMua(null)
+                            .tcBan(null)
+                            .tcRong(null)
                             .foreignBuyTong(foreignBuy)
                             .foreignSellTong(foreignSell)
                             .foreignNetTong(foreignBuy.subtract(foreignSell))
                             .tdMuaTong(propBuy)
                             .tdBanTong(propSell)
                             .tdRongTong(propBuy.subtract(propSell))
-                            .cnMuaTong(BigDecimal.ZERO)
-                            .cnBanTong(BigDecimal.ZERO)
-                            .cnRongTong(BigDecimal.ZERO)
-                            .tcMuaTong(BigDecimal.ZERO)
-                            .tcBanTong(BigDecimal.ZERO)
-                            .tcRongTong(BigDecimal.ZERO)
+                            .cnMuaTong(null)
+                            .cnBanTong(null)
+                            .cnRongTong(null)
+                            .tcMuaTong(null)
+                            .tcBanTong(null)
+                            .tcRongTong(null)
                             .build();
                 }
         );
@@ -442,43 +454,40 @@ public class TimescaleMarketRepository {
     }
 
     private StockHistoryDTO mapStockHistory(ResultSet rs) throws SQLException {
-        Long foreignBuyVolume = getLong(rs, "fr_buy_volume");
-        Long foreignSellVolume = getLong(rs, "fr_sell_volume");
-        Long activeBuyVolume = getLong(rs, "matched_buy_volume");
-        Long activeSellVolume = getLong(rs, "matched_sell_volume");
-        BigDecimal propBuy = getBigDecimal(rs, "prop_buy_volume");
-        BigDecimal propSell = getBigDecimal(rs, "prop_sell_volume");
+        BigDecimal foreignBuyValue = getBigDecimal(rs, "fr_buy_value");
+        BigDecimal foreignSellValue = getBigDecimal(rs, "fr_sell_value");
+        BigDecimal activeBuyValue = getBigDecimal(rs, "matched_buy_value");
+        BigDecimal activeSellValue = getBigDecimal(rs, "matched_sell_value");
+        BigDecimal propBuy = getBigDecimal(rs, "prop_buy_value");
+        BigDecimal propSell = getBigDecimal(rs, "prop_sell_value");
 
         return StockHistoryDTO.builder()
                 .symbol(rs.getString("symbol"))
                 .tradeDate(toLocalDate(rs, "trading_date"))
-                .totalVolume(getLong(rs, "volume"))
-                .buyOrderVolume(getLong(rs, "buy_volume"))
-                .sellOrderVolume(getLong(rs, "sell_volume"))
-                .avgBuyOrderVolume(getBigDecimal(rs, "avg_buy_order"))
-                .avgSellOrderVolume(getBigDecimal(rs, "avg_sell_order"))
+                .totalValue(getBigDecimal(rs, "value"))
+                .buyOrderValue(getBigDecimal(rs, "buy_value"))
+                .sellOrderValue(getBigDecimal(rs, "sell_value"))
+                .avgBuyOrderValue(getBigDecimal(rs, "avg_buy_order"))
+                .avgSellOrderValue(getBigDecimal(rs, "avg_sell_order"))
                 .orderRatio(getDouble(rs, "ratio_sell_buy_order"))
-                .activeBuyVolume(activeBuyVolume)
-                .activeSellVolume(activeSellVolume)
+                .activeBuyValue(activeBuyValue)
+                .activeSellValue(activeSellValue)
                 .avgMatchedBuy(null)
                 .avgMatchedSell(null)
-                .matchedRatio(calculateRatio(activeSellVolume, activeBuyVolume))
+                .matchedRatio(calculateRatio(activeSellValue, activeBuyValue))
                 .priceAdjustment1(null)
                 .priceAdjustment2(null)
                 .priceAdjustment3(null)
                 .priceAdjustment4(null)
                 .avgAdjustment1(null)
                 .avgAdjustment2(null)
-                .cancelBuyVolume(getLong(rs, "cancel_buy_volume"))
-                .cancelSellVolume(getLong(rs, "cancel_sell_volume"))
+                .cancelBuyValue(getBigDecimal(rs, "cancel_buy_value"))
+                .cancelSellValue(getBigDecimal(rs, "cancel_sell_value"))
                 .avgCancelBuy(null)
                 .avgCancelSell(null)
-                .foreignBuyVolume(foreignBuyVolume)
-                .foreignSellVolume(foreignSellVolume)
-                .foreignNetVolume(calculateNetLong(foreignBuyVolume, foreignSellVolume))
-                .foreignBuyVal(null)
-                .foreignSellVal(null)
-                .foreignNetVal(null)
+                .foreignBuyVal(foreignBuyValue)
+                .foreignSellVal(foreignSellValue)
+                .foreignNetVal(calculateNet(foreignBuyValue, foreignSellValue))
                 .propBuyVal(propBuy)
                 .propSellVal(propSell)
                 .propNetVal(calculateNet(propBuy, propSell))
@@ -509,12 +518,12 @@ public class TimescaleMarketRepository {
         return defaultZero(buy) - defaultZero(sell);
     }
 
-    private static Double calculateRatio(Long numerator, Long denominator) {
-        if (numerator == null || denominator == null || denominator == 0L) {
+    private static Double calculateRatio(BigDecimal numerator, BigDecimal denominator) {
+        if (numerator == null || denominator == null || denominator.compareTo(BigDecimal.ZERO) == 0) {
             return null;
         }
-        return BigDecimal.valueOf(numerator)
-                .divide(BigDecimal.valueOf(denominator), 4, RoundingMode.HALF_UP)
+        return numerator
+                .divide(denominator, 4, RoundingMode.HALF_UP)
                 .doubleValue();
     }
 

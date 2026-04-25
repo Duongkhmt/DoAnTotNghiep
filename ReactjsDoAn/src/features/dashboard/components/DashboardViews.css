@@ -7,6 +7,9 @@
     display: flex;
     flex-direction: column;
     gap: 1.25rem;
+    height: 100%;
+    overflow-y: auto;
+    padding-right: 0.5rem;
 }
 
 .dashboard-hero {
@@ -49,6 +52,64 @@
     align-items: center;
     flex-wrap: wrap;
     justify-content: flex-end;
+    position: relative;
+}
+
+/* Column Settings Dropdown */
+.settings-dropdown-wrapper {
+    position: relative;
+}
+
+.settings-menu {
+    position: absolute;
+    top: 100%;
+    right: 0;
+    z-index: 1000;
+    background: var(--card-bg);
+    backdrop-filter: var(--glass-blur);
+    -webkit-backdrop-filter: var(--glass-blur);
+    border: 1px solid var(--card-border);
+    border-radius: 14px;
+    box-shadow: var(--glass-shadow);
+    padding: 1rem;
+    min-width: 260px;
+    max-height: 400px;
+    overflow-y: auto;
+    margin-top: 0.75rem;
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 0.25rem;
+    animation: fadeIn 0.2s ease-out;
+}
+
+.settings-menu-item {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    padding: 0.65rem 0.85rem;
+    border-radius: 10px;
+    cursor: pointer;
+    transition: all 0.2s;
+    font-size: 0.85rem;
+    font-weight: 500;
+    color: var(--text-color);
+    white-space: nowrap;
+}
+
+.settings-menu-item:hover {
+    background: #f1f5f9;
+}
+
+.settings-menu-item input[type="checkbox"] {
+    display: none;
+}
+
+.checkbox-custom {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.15rem;
+    min-width: 20px;
 }
 
 .search-box,
@@ -243,14 +304,15 @@
 }
 
 .financial-table th {
-    background: linear-gradient(180deg, #0f766e, #115e59) !important;
+    background: linear-gradient(180deg, #0f766e, #115e59);
     color: white;
     position: sticky;
     top: 0;
     z-index: 10;
     font-weight: 700;
     text-align: right;
-    border-bottom: 2px solid #0b4f4b;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+    border-right: 1px solid rgba(255, 255, 255, 0.1);
 }
 
 .financial-table th:first-child,
@@ -351,21 +413,32 @@
     background-color: #fef3c7;
 }
 
+.grouped-header-table thead tr:nth-child(1) th {
+    top: 0;
+    z-index: 12;
+}
+
+.grouped-header-table thead tr:nth-child(2) th {
+    top: 41px; /* Chiều cao xấp xỉ của hàng tiêu đề đầu tiên */
+    z-index: 11;
+    font-size: 0.75rem;
+    padding: 0.5rem 0.78rem;
+}
+
 .grouped-header-table th {
     text-align: center;
-    border-right: 1px solid rgba(255, 255, 255, 0.08);
 }
 
 .grouped-header-table .header-buy {
-    color: #dcfce7;
+    color: #4ade80 !important;
 }
 
 .grouped-header-table .header-sell {
-    color: #fee2e2;
+    color: #f87171 !important;
 }
 
 .grouped-header-table .header-net {
-    color: #dbeafe;
+    color: #60a5fa !important;
 }
 
 .header-foreign {

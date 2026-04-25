@@ -11,19 +11,19 @@ public class StockHistoryDTO {
     private String symbol;
     private LocalDate tradeDate;
 
-    // Khối lượng khớp
-    private Long totalVolume;
+    // Giá trị khớp
+    private BigDecimal totalValue;
 
     // Đặt lệnh
-    private Long buyOrderVolume;
-    private Long sellOrderVolume;
-    private BigDecimal avgBuyOrderVolume;
-    private BigDecimal avgSellOrderVolume;
+    private BigDecimal buyOrderValue;
+    private BigDecimal sellOrderValue;
+    private BigDecimal avgBuyOrderValue;
+    private BigDecimal avgSellOrderValue;
     private Double orderRatio;
 
     // Khớp lệnh chủ động
-    private Long activeBuyVolume;
-    private Long activeSellVolume;
+    private BigDecimal activeBuyValue;
+    private BigDecimal activeSellValue;
     private BigDecimal avgMatchedBuy;
     private BigDecimal avgMatchedSell;
     private Double matchedRatio;
@@ -37,15 +37,12 @@ public class StockHistoryDTO {
     private BigDecimal avgAdjustment2;
 
     // Hủy lệnh
-    private Long cancelBuyVolume;
-    private Long cancelSellVolume;
-    private BigDecimal avgCancelBuy;   // <-- Thêm dòng này
-    private BigDecimal avgCancelSell;  // <-- Thêm dòng này
+    private BigDecimal cancelBuyValue;
+    private BigDecimal cancelSellValue;
+    private BigDecimal avgCancelBuy;
+    private BigDecimal avgCancelSell;
 
     // Khối ngoại
-    private Long foreignBuyVolume;
-    private Long foreignSellVolume;
-    private Long foreignNetVolume;
     private BigDecimal foreignBuyVal;
     private BigDecimal foreignSellVal;
     private BigDecimal foreignNetVal;

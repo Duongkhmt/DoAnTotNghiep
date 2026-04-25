@@ -17,7 +17,7 @@ const Dashboard = () => {
     const { currentUser, handleGoogleLoginCallback } = useAuth();
 
     const [activeTab, setActiveTab] = useState('DINH_GIA');
-    const [symbol, setSymbol] = useState('PVT');
+    const [symbol, setSymbol] = useState('');
     const [date, setDate] = useState(() => new Date().toISOString().split('T')[0]);
 
     useEffect(() => {
@@ -38,7 +38,7 @@ const Dashboard = () => {
 
             <main
                 className="dashboard-content"
-                style={{ padding: 0, display: 'flex', flexDirection: 'column', height: 'calc(100vh - 64px)' }}
+                style={{ padding: 0, display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0 }}
             >
                 <nav className="dashboard-nav-tabs">
                     <button className="tab-btn">Dashboard</button>
@@ -83,7 +83,7 @@ const Dashboard = () => {
                 <div className="dashboard-body" style={{ display: 'flex', flex: 1, overflow: 'hidden' }}>
                     <StockSidebar selectedSymbol={symbol} onSelectSymbol={setSymbol} />
 
-                    <div className="tab-content custom-scrollbar" style={{ flex: 1, padding: '1rem 1.5rem', overflowY: 'auto' }}>
+                    <div className="tab-content custom-scrollbar" style={{ flex: 1, padding: '1rem 1.5rem', overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
                         {activeTab === 'DINH_GIA' && (
                             <ValuationChart symbol={symbol} date={date} onSymbolChange={setSymbol} onDateChange={setDate} />
                         )}

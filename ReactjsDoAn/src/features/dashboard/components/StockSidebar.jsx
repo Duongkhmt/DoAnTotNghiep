@@ -14,7 +14,14 @@ const StockSidebar = ({ selectedSymbol, onSelectSymbol }) => {
             setLoading(true);
             try {
                 const data = await marketService.getAllStocks();
-                setStocks(data || []);
+                const stocksData = data || [];
+                setStocks(stocksData);
+                
+                // Tự động chọn mã đầu tiên nếu chưa có mã nào được chọn
+                if (stocksData.length > 0 && !selectedSymbol) {
+                    const firstSymbol = typeof stocksData[0] === 'string' ? stocksData[0] : stocksData[0].symbol;
+                    onSelectSymbol(firstSymbol);
+                }
             } catch (error) {
                 console.error('Failed to fetch stocks:', error);
             } finally {
