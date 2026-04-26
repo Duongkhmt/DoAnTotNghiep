@@ -114,6 +114,10 @@ class MarketService {
     predictNow(symbols) {
         return api.post('/ai/predict-now', symbols).then((res) => res.data);
     }
+
+    getWyckoffAnalysis(symbol) {
+        return api.get(`/stocks/${symbol}/wyckoff`).then((res) => res.data);
+    }
 }
 
 export default new MarketService();

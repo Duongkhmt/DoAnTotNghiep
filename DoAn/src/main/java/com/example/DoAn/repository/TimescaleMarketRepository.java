@@ -7,6 +7,8 @@ import com.example.DoAn.dto.response.PredictionResponse;
 import com.example.DoAn.dto.response.StockHistoryDTO;
 import com.example.DoAn.dto.response.StockResponseDTO;
 import com.example.DoAn.dto.response.ValuationDTO;
+import com.example.DoAn.dto.response.WyckoffAnalysisDTO;
+import com.example.DoAn.dto.response.WyckoffAnalysisDTO;
 import org.springframework.jdbc.core.namedparam.MapSqlParameterSource;
 import org.springframework.jdbc.core.namedparam.NamedParameterJdbcTemplate;
 import org.springframework.stereotype.Repository;
@@ -89,8 +91,12 @@ public class TimescaleMarketRepository {
                 SELECT
                     q.symbol,
                     q.trading_date,
-                    q.volume AS value,
+                    q.open,
+                    q.high,
+                    q.low,
                     q.close,
+                    q.volume,
+                    q.turnover,
                     dos.buy_volume AS buy_value,
                     dos.sell_volume AS sell_value,
                     dos.avg_buy_order,
@@ -473,7 +479,13 @@ public class TimescaleMarketRepository {
         return StockHistoryDTO.builder()
                 .symbol(rs.getString("symbol"))
                 .tradeDate(toLocalDate(rs, "trading_date"))
-                .totalValue(getBigDecimal(rs, "value"))
+                .openPrice(getBigDecimal(rs, "open"))
+                .highPrice(getBigDecimal(rs, "high"))
+                .lowPrice(getBigDecimal(rs, "low"))
+                .closePrice(getBigDecimal(rs, "close"))
+                .volume(getBigDecimal(rs, "volume"))
+                .turnover(getBigDecimal(rs, "turnover"))
+                .totalValue(getBigDecimal(rs, "volume"))
                 .buyOrderValue(getBigDecimal(rs, "buy_value"))
                 .sellOrderValue(getBigDecimal(rs, "sell_value"))
                 .avgBuyOrderValue(getBigDecimal(rs, "avg_buy_order"))
@@ -570,5 +582,27 @@ public class TimescaleMarketRepository {
 
     private static Long defaultZero(Long value) {
         return value == null ? 0L : value;
+    }
+
+    public Optional<WyckoffAnalysisDTO> findWyckoffAnalysis(String symbol) {
+        String sql = """
+                SELECT * FROM wyckoff_analysis WHERE symbol = :symbol
+                """;
+        List<WyckoffAnalysisDTO> results = jdbcTemplate.query(
+                sql,
+                new MapSqlParameterSource("symbol", symbol),
+                (rs, rowNum) -> WyckoffAnalysisDTO.builder()
+                        .symbol(rs.getString("symbol"))
+                        .phase(rs.getString("phase"))
+                        .schematic(rs.getString("schematic"))
+                        .trLow(getBigDecimal(rs, "tr_low"))
+                        .trHigh(getBigDecimal(rs, "tr_high"))
+                        .lastClose(getBigDecimal(rs, "last_close"))
+                        .lastDate(toLocalDate(rs, "last_date"))
+                        .riskReward(getBigDecimal(rs, "risk_reward"))
+                        .dataJson(rs.getString("data_json"))
+                        .build()
+        );
+        return results.stream().findFirst();
     }
 }

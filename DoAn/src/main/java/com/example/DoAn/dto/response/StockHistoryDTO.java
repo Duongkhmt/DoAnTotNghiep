@@ -12,7 +12,13 @@ public class StockHistoryDTO {
     private LocalDate tradeDate;
 
     // Giá trị khớp
-    private BigDecimal totalValue;
+    private BigDecimal totalValue; // Đây là khối lượng khớp (shares)
+    private BigDecimal openPrice;
+    private BigDecimal highPrice;
+    private BigDecimal lowPrice;
+    private BigDecimal closePrice;
+    private BigDecimal volume; // shares
+    private BigDecimal turnover; // value
 
     // Đặt lệnh
     private BigDecimal buyOrderValue;
@@ -66,5 +72,4 @@ public class StockHistoryDTO {
     private BigDecimal pe;
     private BigDecimal pb;
     private BigDecimal marketCap;
-    private BigDecimal closePrice;
 }

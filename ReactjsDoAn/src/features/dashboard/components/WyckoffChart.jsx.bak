@@ -1,0 +1,76 @@
+
+import React, { useEffect, useState } from 'react';
+import Plot from 'react-plotly.js';
+import { FiCalendar, FiSearch } from 'react-icons/fi';
+import marketService from '../services/market.service';
+import './DashboardViews.css';
+
+const WyckoffChart = ({ symbol, date, onSymbolChange, onDateChange }) => {
+    const [chartData, setChartData] = useState(null);
+    const [wyckoffData, setWyckoffData] = useState(null);
+    const [loading, setLoading] = useState(false);
+    const [endDate, setEndDate] = useState(date || new Date().toISOString().split('T')[0]);
+    const [startDate, setStartDate] = useState(() => {
+        const d = new Date(date || new Date().toISOString().split('T')[0]);
+        d.setMonth(d.getMonth() - 6); // Default 6 months
+        return d.toISOString().split('T')[0];
+    });
+
+    useEffect(() => {
+        if (!symbol) return;
+
+        const fetchData = async () => {
+            setLoading(true);
+            try {
+                const [history, wyckoff] = await Promise.all([
+                    marketService.getStockHistoryByDateRange(symbol, startDate, endDate),
+                    marketService.getWyckoffAnalysis(symbol)
+                ]);
+
+                // Process history data for Plotly
+                const sortedHistory = [...history].sort((a, b) => new Date(a.tradeDate) - new Date(b.tradeDate));
+                setChartData(sortedHistory);
+                setWyckoffData(wyckoff);
+            } catch (error) {
+                console.error('Error fetching Wyckoff data:', error);
+            } finally {
+                setLoading(false);
+            }
+        };
+
+        fetchData();
+    }, [symbol, startDate, endDate]);
+
+    if (!symbol) {
+        return <div className="view-container">Chọn một mã cổ phiếu để xem phân tích Wyckoff</div>;
+    }
+
+    const preparePlotData = () => {
+        if (!chartData) return [];
+
+        const x = chartData.map(d => d.tradeDate);
+        const open = chartData.map(d => d.closePrice); // Note: existing DTO might not have full OHLC?
+        // Wait, I need to check if StockHistoryDTO has OHLC.
+        // Looking at TimescaleMarketRepository.java, mapStockHistory only has 'close'.
+        // This is a problem. I might need to update the repository to fetch OHLC for this chart.
+        
+        // Actually, let me check the repository again.
+        // It fetches 'q.close AS value', but not open, high, low.
+        
+        return [];
+    };
+
+    // Before writing the file, I MUST update the Java backend to include OHLC in StockHistoryDTO
+    // or create a new endpoint/method for full OHLC.
+
+    return (
+        <div className="view-container animate-fade-in">
+            {/* Header controls same as ValuationChart */}
+            <div className="view-header">
+                <h2>Phân tích Wyckoff & VSA: {symbol}</h2>
+                {/* ... (omitted for now) */}
+            </div>
+            {/* ... */}
+        </div>
+    );
+};

@@ -1,6 +1,7 @@
 package com.example.DoAn.controller;
 
 import com.example.DoAn.dto.response.StockResponseDTO;
+import com.example.DoAn.dto.response.WyckoffAnalysisDTO;
 import com.example.DoAn.service.StockService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
@@ -32,5 +33,10 @@ public class StockController {
     @GetMapping("/{symbol}")
     public ResponseEntity<StockResponseDTO> getStockDetail(@PathVariable String symbol) {
         return ResponseEntity.ok(stockService.getStockDetailBySymbol(symbol));
+    }
+
+    @GetMapping("/{symbol}/wyckoff")
+    public ResponseEntity<WyckoffAnalysisDTO> getWyckoffAnalysis(@PathVariable String symbol) {
+        return ResponseEntity.ok(stockService.getWyckoffAnalysis(symbol));
     }
 }

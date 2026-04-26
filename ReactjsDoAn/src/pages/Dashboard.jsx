@@ -9,6 +9,7 @@ import IndustryFlowTable from '../features/dashboard/components/IndustryFlowTabl
 import NewsSection from '../features/dashboard/components/NewsSection';
 import PredictionPanel from '../features/dashboard/components/PredictionPanel';
 import StockSidebar from '../features/dashboard/components/StockSidebar';
+import WyckoffChart from '../features/dashboard/components/WyckoffChart';
 import './Dashboard.css';
 
 const Dashboard = () => {
@@ -78,12 +79,18 @@ const Dashboard = () => {
                     >
                         Mua/Bán các khối
                     </button>
+                    <button
+                        className={`tab-btn ${activeTab === 'WYCKOFF' ? 'active' : ''}`}
+                        onClick={() => setActiveTab('WYCKOFF')}
+                    >
+                        Wyckoff + VSA
+                    </button>
                 </nav>
 
                 <div className="dashboard-body" style={{ display: 'flex', flex: 1, overflow: 'hidden' }}>
                     <StockSidebar selectedSymbol={symbol} onSelectSymbol={setSymbol} />
 
-                    <div className="tab-content custom-scrollbar" style={{ flex: 1, padding: '1rem 1.5rem', overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
+                    <div className="tab-content custom-scrollbar" style={{ flex: 1, padding: '1rem 1.5rem', overflowY: 'auto', display: 'flex', flexDirection: 'column', height: '100%' }}>
                         {activeTab === 'DINH_GIA' && (
                             <ValuationChart symbol={symbol} date={date} onSymbolChange={setSymbol} onDateChange={setDate} />
                         )}
@@ -102,6 +109,10 @@ const Dashboard = () => {
 
                         {activeTab === 'DONG_TIEN' && (
                             <IndustryFlowTable date={date} onDateChange={setDate} />
+                        )}
+
+                        {activeTab === 'WYCKOFF' && (
+                            <WyckoffChart symbol={symbol} date={date} onSymbolChange={setSymbol} onDateChange={setDate} />
                         )}
 
                         {activeTab === 'TIN_TUC' && <NewsSection />}
