@@ -18,6 +18,7 @@ public class PredictionResponse {
     private LocalDate predictDate;
     private LocalDate targetDate;
     private BigDecimal predictedClose;
+    private BigDecimal actualClose;
     private String trend;
     private String modelUsed;
     private LocalDateTime createdAt;

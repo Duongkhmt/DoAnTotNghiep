@@ -36,21 +36,26 @@ const ValuationChart = ({ symbol, date, onSymbolChange, onDateChange }) => {
         const fetchData = async () => {
             setLoading(true);
             try {
-                const [history, valuation] = await Promise.all([
-                    marketService.getStockHistoryByDateRange(symbol, startDate, endDate),
-                    marketService.getValuation(symbol, endDate)
-                ]);
+                // Fetch history separately
+                marketService.getStockHistoryByDateRange(symbol, startDate, endDate)
+                    .then(history => {
+                        const sortedHistory = [...history].sort(
+                            (a, b) => new Date(a.tradeDate) - new Date(b.tradeDate)
+                        );
+                        setHistoryData(sortedHistory);
+                    })
+                    .catch(err => console.error('Error fetching history:', err));
 
-                const sortedHistory = [...history].sort(
-                    (a, b) => new Date(a.tradeDate) - new Date(b.tradeDate)
-                );
+                // Fetch valuation stats separately
+                marketService.getValuation(symbol, endDate)
+                    .then(valuation => setValuationData(valuation))
+                    .catch(err => {
+                        console.error('Error fetching valuation stats:', err);
+                        setValuationData(null);
+                    });
 
-                setHistoryData(sortedHistory);
-                setValuationData(valuation);
             } catch (error) {
-                console.error('Error fetching valuation:', error);
-                setHistoryData([]);
-                setValuationData(null);
+                console.error('Unexpected error in fetchData:', error);
             } finally {
                 setLoading(false);
             }
@@ -149,8 +154,8 @@ const ValuationChart = ({ symbol, date, onSymbolChange, onDateChange }) => {
                                         labelFormatter={(label) => formatXAxis(label)}
                                     />
                                     <Legend />
-                                    <Area yAxisId="left" type="monotone" dataKey="pe" name="P/E" stroke="#3b82f6" fillOpacity={1} fill="url(#colorPE)" />
-                                    <Area yAxisId="right" type="monotone" dataKey="pb" name="P/B" stroke="#f97316" fillOpacity={1} fill="url(#colorPB)" />
+                                    <Area yAxisId="left" type="monotone" dataKey="pe" name="P/E" stroke="#3b82f6" fillOpacity={1} fill="url(#colorPE)" connectNulls />
+                                    <Area yAxisId="right" type="monotone" dataKey="pb" name="P/B" stroke="#f97316" fillOpacity={1} fill="url(#colorPB)" connectNulls />
                                 </AreaChart>
                             </ResponsiveContainer>
                         </div>

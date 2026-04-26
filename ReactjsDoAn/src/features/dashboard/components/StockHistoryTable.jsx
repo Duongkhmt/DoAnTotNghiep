@@ -7,23 +7,23 @@ import './DashboardViews.css';
 const ALL_COLUMNS = [
     { id: 'symbol', label: 'Mã cổ phiếu', defaultVisible: true },
     { id: 'tradeDate', label: 'Ngày giao dịch', defaultVisible: true },
-    { id: 'totalValue', label: 'Giá trị khớp', defaultVisible: true },
-    { id: 'buyOrderValue', label: 'GT đặt mua', defaultVisible: true },
-    { id: 'sellOrderValue', label: 'GT đặt bán', defaultVisible: true },
-    { id: 'avgBuyOrderVolume', label: 'GT TB đặt mua', defaultVisible: true },
-    { id: 'avgSellOrderVolume', label: 'GT TB đặt bán', defaultVisible: true },
+    { id: 'totalValue', label: 'Khối lượng khớp', defaultVisible: true },
+    { id: 'buyOrderValue', label: 'KL đặt mua', defaultVisible: true },
+    { id: 'sellOrderValue', label: 'KL đặt bán', defaultVisible: true },
+    { id: 'avgBuyOrderVolume', label: 'KL TB đặt mua', defaultVisible: true },
+    { id: 'avgSellOrderVolume', label: 'KL TB đặt bán', defaultVisible: true },
     { id: 'orderRatio', label: 'Hệ số TB đặt bán/mua', defaultVisible: true },
-    { id: 'activeBuyValue', label: 'GT khớp mua', defaultVisible: true },
-    { id: 'activeSellValue', label: 'GT khớp bán', defaultVisible: true },
-    { id: 'avgMatchedBuy', label: 'GT TB khớp mua', defaultVisible: true },
-    { id: 'avgMatchedSell', label: 'GT TB khớp bán', defaultVisible: true },
+    { id: 'activeBuyValue', label: 'KL khớp mua', defaultVisible: true },
+    { id: 'activeSellValue', label: 'KL khớp bán', defaultVisible: true },
+    { id: 'avgMatchedBuy', label: 'KL TB khớp mua', defaultVisible: true },
+    { id: 'avgMatchedSell', label: 'KL TB khớp bán', defaultVisible: true },
     { id: 'matchedRatio', label: 'Hệ số khớp bán/mua', defaultVisible: true },
     { id: 'foreignBuyVal', label: 'GT NN mua', defaultVisible: true },
     { id: 'foreignSellVal', label: 'GT NN bán', defaultVisible: true },
-    { id: 'cancelBuyValue', label: 'GT hủy mua', defaultVisible: true },
-    { id: 'cancelSellValue', label: 'GT hủy bán', defaultVisible: true },
-    { id: 'avgCancelBuy', label: 'GT TB hủy mua', defaultVisible: true },
-    { id: 'avgCancelSell', label: 'GT TB hủy bán', defaultVisible: true }
+    { id: 'cancelBuyValue', label: 'KL hủy mua', defaultVisible: true },
+    { id: 'cancelSellValue', label: 'KL hủy bán', defaultVisible: true },
+    { id: 'avgCancelBuy', label: 'KL TB hủy mua', defaultVisible: true },
+    { id: 'avgCancelSell', label: 'KL TB hủy bán', defaultVisible: true }
 ];
 
 const StockHistoryTable = ({ symbol, date, onSymbolChange, onDateChange }) => {
@@ -151,23 +151,23 @@ const StockHistoryTable = ({ symbol, date, onSymbolChange, onDateChange }) => {
                             <tr>
                                 {visibleColumns.symbol && <th className="bg-col-white">Mã CP</th>}
                                 {visibleColumns.tradeDate && <th className="bg-col-white">Ngày GD</th>}
-                                {visibleColumns.totalValue && <th className="bg-col-group1">Giá trị khớp</th>}
-                                {visibleColumns.buyOrderValue && <th className="bg-col-group2">GT đặt mua</th>}
-                                {visibleColumns.sellOrderValue && <th className="bg-col-group2">GT đặt bán</th>}
-                                {visibleColumns.avgBuyOrderVolume && <th className="bg-col-group2">GT TB đặt mua</th>}
-                                {visibleColumns.avgSellOrderVolume && <th className="bg-col-group2">GT TB đặt bán</th>}
+                                {visibleColumns.totalValue && <th className="bg-col-group1">Khối lượng khớp</th>}
+                                {visibleColumns.buyOrderValue && <th className="bg-col-group2">KL đặt mua</th>}
+                                {visibleColumns.sellOrderValue && <th className="bg-col-group2">KL đặt bán</th>}
+                                {visibleColumns.avgBuyOrderVolume && <th className="bg-col-group2">KL TB đặt mua</th>}
+                                {visibleColumns.avgSellOrderVolume && <th className="bg-col-group2">KL TB đặt bán</th>}
                                 {visibleColumns.orderRatio && <th className="bg-col-group2 highlight-col">Hệ số TB đặt bán/mua</th>}
-                                {visibleColumns.activeBuyValue && <th className="bg-col-group2">GT khớp mua</th>}
-                                {visibleColumns.activeSellValue && <th className="bg-col-group1">GT khớp bán</th>}
-                                {visibleColumns.avgMatchedBuy && <th className="bg-col-group1">GT TB khớp mua</th>}
-                                {visibleColumns.avgMatchedSell && <th className="bg-col-group1">GT TB khớp bán</th>}
+                                {visibleColumns.activeBuyValue && <th className="bg-col-group2">KL khớp mua</th>}
+                                {visibleColumns.activeSellValue && <th className="bg-col-group1">KL khớp bán</th>}
+                                {visibleColumns.avgMatchedBuy && <th className="bg-col-group1">KL TB khớp mua</th>}
+                                {visibleColumns.avgMatchedSell && <th className="bg-col-group1">KL TB khớp bán</th>}
                                 {visibleColumns.matchedRatio && <th className="bg-col-group2 highlight-col">Hệ số khớp bán/mua</th>}
                                 {visibleColumns.foreignBuyVal && <th className="bg-col-group1">GT NN mua</th>}
                                 {visibleColumns.foreignSellVal && <th className="bg-col-group2">GT NN bán</th>}
-                                {visibleColumns.cancelBuyValue && <th className="bg-col-group2">GT hủy mua</th>}
-                                {visibleColumns.cancelSellValue && <th className="bg-col-group2">GT hủy bán</th>}
-                                {visibleColumns.avgCancelBuy && <th className="bg-col-group2">GT TB hủy mua</th>}
-                                {visibleColumns.avgCancelSell && <th className="bg-col-group2">GT TB hủy bán</th>}
+                                {visibleColumns.cancelBuyValue && <th className="bg-col-group2">KL hủy mua</th>}
+                                {visibleColumns.cancelSellValue && <th className="bg-col-group2">KL hủy bán</th>}
+                                {visibleColumns.avgCancelBuy && <th className="bg-col-group2">KL TB hủy mua</th>}
+                                {visibleColumns.avgCancelSell && <th className="bg-col-group2">KL TB hủy bán</th>}
                             </tr>
                         </thead>
                         <tbody>

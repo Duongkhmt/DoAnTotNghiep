@@ -106,6 +106,14 @@ class MarketService {
             params: { limit }
         }).then((res) => res.data);
     }
+
+    triggerPrediction() {
+        return api.post('/ai/trigger-prediction').then((res) => res.data);
+    }
+
+    predictNow(symbols) {
+        return api.post('/ai/predict-now', symbols).then((res) => res.data);
+    }
 }
 
 export default new MarketService();

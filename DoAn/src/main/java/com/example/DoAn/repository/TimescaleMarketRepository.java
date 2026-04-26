@@ -89,7 +89,7 @@ public class TimescaleMarketRepository {
                 SELECT
                     q.symbol,
                     q.trading_date,
-                    q.turnover AS value,
+                    q.volume AS value,
                     q.close,
                     dos.buy_volume AS buy_value,
                     dos.sell_volume AS sell_value,
@@ -104,17 +104,17 @@ public class TimescaleMarketRepository {
                     t.fr_sell_value,
                     t.prop_buy_value,
                     t.prop_sell_value,
-                    dv.pe,
-                    dv.pb
+                    dv.pe AS pe_val,
+                    dv.pb AS pb_val
                 FROM quote_history q
                 LEFT JOIN dashboard_order_stats dos
-                    ON dos.symbol = q.symbol
+                    ON UPPER(TRIM(dos.symbol)) = UPPER(TRIM(q.symbol))
                    AND dos.trading_date = q.trading_date
                 LEFT JOIN trading t
-                    ON t.symbol = q.symbol
+                    ON UPPER(TRIM(t.symbol)) = UPPER(TRIM(q.symbol))
                    AND t.trading_date = q.trading_date
                 LEFT JOIN dashboard_valuation dv
-                    ON dv.symbol = q.symbol
+                    ON UPPER(TRIM(dv.symbol)) = UPPER(TRIM(q.symbol))
                    AND dv.trading_date = q.trading_date
                 WHERE q.symbol = :symbol
                   AND q.trading_date BETWEEN :startDate AND :endDate
@@ -138,7 +138,7 @@ public class TimescaleMarketRepository {
                     dv.pe,
                     dv.pb
                 FROM dashboard_valuation dv
-                WHERE dv.symbol = :symbol
+                WHERE UPPER(TRIM(dv.symbol)) = UPPER(TRIM(:symbol))
                   AND dv.trading_date <= :date
                 ORDER BY dv.trading_date DESC
                 LIMIT 1
@@ -324,15 +324,19 @@ public class TimescaleMarketRepository {
         return jdbcTemplate.query(
                 """
                         SELECT
-                            symbol,
-                            predict_date,
-                            target_date,
-                            predicted_close,
-                            trend,
-                            model_used,
-                            created_at
-                        FROM ml_predictions
-                        ORDER BY created_at DESC
+                            p.symbol,
+                            p.predict_date,
+                            p.target_date,
+                            p.predicted_close,
+                            q.close AS actual_close,
+                            p.trend,
+                            p.model_used,
+                            p.created_at
+                        FROM ml_predictions p
+                        LEFT JOIN quote_history q
+                               ON q.symbol = p.symbol
+                              AND q.trading_date = p.target_date
+                        ORDER BY p.created_at DESC
                         LIMIT :limit
                         """,
                 new MapSqlParameterSource("limit", limit),
@@ -344,16 +348,20 @@ public class TimescaleMarketRepository {
         return jdbcTemplate.query(
                 """
                         SELECT
-                            symbol,
-                            predict_date,
-                            target_date,
-                            predicted_close,
-                            trend,
-                            model_used,
-                            created_at
-                        FROM ml_predictions
-                        WHERE symbol = :symbol
-                        ORDER BY created_at DESC
+                            p.symbol,
+                            p.predict_date,
+                            p.target_date,
+                            p.predicted_close,
+                            q.close AS actual_close,
+                            p.trend,
+                            p.model_used,
+                            p.created_at
+                        FROM ml_predictions p
+                        LEFT JOIN quote_history q
+                               ON q.symbol = p.symbol
+                              AND q.trading_date = p.target_date
+                        WHERE p.symbol = :symbol
+                        ORDER BY p.created_at DESC
                         LIMIT :limit
                         """,
                 new MapSqlParameterSource()
@@ -447,6 +455,7 @@ public class TimescaleMarketRepository {
                 .predictDate(toLocalDate(rs, "predict_date"))
                 .targetDate(toLocalDate(rs, "target_date"))
                 .predictedClose(getBigDecimal(rs, "predicted_close"))
+                .actualClose(getBigDecimal(rs, "actual_close"))
                 .trend(rs.getString("trend"))
                 .modelUsed(rs.getString("model_used"))
                 .createdAt(toLocalDateTime(rs, "created_at"))
@@ -497,8 +506,8 @@ public class TimescaleMarketRepository {
                 .orgBuyVal(null)
                 .orgSellVal(null)
                 .orgNetVal(null)
-                .pe(getBigDecimal(rs, "pe"))
-                .pb(getBigDecimal(rs, "pb"))
+                .pe(getBigDecimal(rs, "pe_val"))
+                .pb(getBigDecimal(rs, "pb_val"))
                 .marketCap(null)
                 .closePrice(getBigDecimal(rs, "close"))
                 .build();
