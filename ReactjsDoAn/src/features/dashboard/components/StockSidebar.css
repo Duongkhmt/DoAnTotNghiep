@@ -150,3 +150,13 @@
     color: white;
     box-shadow: 0 4px 12px rgba(99, 102, 241, 0.4);
 }
+
+.collapsed .symbol-info .symbol-price,
+.collapsed .symbol-change,
+.collapsed .sidebar-header h3 {
+    display: none;
+}
+
+.collapsed .symbol-item {
+    justify-content: center;
+}
