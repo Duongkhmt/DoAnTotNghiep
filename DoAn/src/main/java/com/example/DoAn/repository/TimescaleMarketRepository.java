@@ -106,6 +106,8 @@ public class TimescaleMarketRepository {
                     dos.matched_sell_volume AS matched_sell_value,
                     dos.cancel_buy_volume AS cancel_buy_value,
                     dos.cancel_sell_volume AS cancel_sell_value,
+                    dos.foreign_buy_volume,
+                    dos.foreign_sell_volume,
                     t.fr_buy_value,
                     t.fr_sell_value,
                     t.prop_buy_value,
@@ -469,8 +471,8 @@ public class TimescaleMarketRepository {
     }
 
     private StockHistoryDTO mapStockHistory(ResultSet rs) throws SQLException {
-        BigDecimal foreignBuyValue = getBigDecimal(rs, "fr_buy_value");
-        BigDecimal foreignSellValue = getBigDecimal(rs, "fr_sell_value");
+        BigDecimal foreignBuyVol = getBigDecimal(rs, "foreign_buy_volume");
+        BigDecimal foreignSellVol = getBigDecimal(rs, "foreign_sell_volume");
         BigDecimal activeBuyValue = getBigDecimal(rs, "matched_buy_value");
         BigDecimal activeSellValue = getBigDecimal(rs, "matched_sell_value");
         BigDecimal propBuy = getBigDecimal(rs, "prop_buy_value");
@@ -488,8 +490,8 @@ public class TimescaleMarketRepository {
                 .totalValue(getBigDecimal(rs, "volume"))
                 .buyOrderValue(getBigDecimal(rs, "buy_value"))
                 .sellOrderValue(getBigDecimal(rs, "sell_value"))
-                .avgBuyOrderValue(getBigDecimal(rs, "avg_buy_order"))
-                .avgSellOrderValue(getBigDecimal(rs, "avg_sell_order"))
+                .avgBuyOrderVolume(getBigDecimal(rs, "avg_buy_order"))
+                .avgSellOrderVolume(getBigDecimal(rs, "avg_sell_order"))
                 .orderRatio(getDouble(rs, "ratio_sell_buy_order"))
                 .activeBuyValue(activeBuyValue)
                 .activeSellValue(activeSellValue)
@@ -506,9 +508,9 @@ public class TimescaleMarketRepository {
                 .cancelSellValue(getBigDecimal(rs, "cancel_sell_value"))
                 .avgCancelBuy(null)
                 .avgCancelSell(null)
-                .foreignBuyVal(foreignBuyValue)
-                .foreignSellVal(foreignSellValue)
-                .foreignNetVal(calculateNet(foreignBuyValue, foreignSellValue))
+                .foreignBuyVol(foreignBuyVol)
+                .foreignSellVol(foreignSellVol)
+                .foreignNetVol(calculateNet(foreignBuyVol, foreignSellVol))
                 .propBuyVal(propBuy)
                 .propSellVal(propSell)
                 .propNetVal(calculateNet(propBuy, propSell))

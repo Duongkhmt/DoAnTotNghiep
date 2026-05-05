@@ -101,6 +101,12 @@ class MarketService {
         }).then((res) => res.data);
     }
 
+    getAiLatestPredictions(limit = 20) {
+        return api.get('/ai/predictions/latest', {
+            params: { limit }
+        }).then((res) => res.data);
+    }
+
     getPredictionsBySymbol(symbol, limit = 20) {
         return api.get(`/predictions/${symbol}`, {
             params: { limit }
@@ -113,6 +119,26 @@ class MarketService {
 
     predictNow(symbols) {
         return api.post('/ai/predict-now', symbols).then((res) => res.data);
+    }
+
+    getAiScreeningToday(params = {}) {
+        return api.get('/ai/screening/today', {
+            params
+        }).then((res) => res.data);
+    }
+
+    getAiScreeningHistory(days = 30) {
+        return api.get('/ai/screening/history', {
+            params: { days }
+        }).then((res) => res.data);
+    }
+
+    getAiMarketOverview() {
+        return api.get('/ai/market/overview').then((res) => res.data);
+    }
+
+    getAiStockDetail(symbol) {
+        return api.get(`/ai/stock/${symbol}/detail`).then((res) => res.data);
     }
 
     getWyckoffAnalysis(symbol) {

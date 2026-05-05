@@ -3,6 +3,7 @@ import { AuthProvider } from './contexts/AuthContext';
 import Home from './pages/Home';
 import Dashboard from './pages/Dashboard';
 import ProfilePage from './pages/ProfilePage';
+import AiScreeningPage from './pages/AiScreeningPage';
 import './index.css';
 
 function App() {
@@ -14,6 +15,7 @@ function App() {
           <Route path="/dashboard" element={<Dashboard />} />
           <Route path="/dashboard.html" element={<Dashboard />} />
           <Route path="/profile" element={<ProfilePage />} />
+          <Route path="/ai-screening" element={<AiScreeningPage />} />
           <Route path="*" element={<Navigate to="/" />} />
         </Routes>
       </Router>

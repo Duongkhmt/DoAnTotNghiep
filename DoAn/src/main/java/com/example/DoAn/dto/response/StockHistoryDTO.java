@@ -23,8 +23,8 @@ public class StockHistoryDTO {
     // Đặt lệnh
     private BigDecimal buyOrderValue;
     private BigDecimal sellOrderValue;
-    private BigDecimal avgBuyOrderValue;
-    private BigDecimal avgSellOrderValue;
+    private BigDecimal avgBuyOrderVolume;
+    private BigDecimal avgSellOrderVolume;
     private Double orderRatio;
 
     // Khớp lệnh chủ động
@@ -49,9 +49,9 @@ public class StockHistoryDTO {
     private BigDecimal avgCancelSell;
 
     // Khối ngoại
-    private BigDecimal foreignBuyVal;
-    private BigDecimal foreignSellVal;
-    private BigDecimal foreignNetVal;
+    private BigDecimal foreignBuyVol;
+    private BigDecimal foreignSellVol;
+    private BigDecimal foreignNetVol;
 
     // Tự doanh
     private BigDecimal propBuyVal;

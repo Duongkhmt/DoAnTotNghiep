@@ -38,12 +38,34 @@
 }
 
 .nav-link {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
     font-weight: 500;
     transition: color 0.2s ease;
+    padding: 0.55rem 0.9rem;
+    border-radius: 999px;
 }
 
 .nav-link:hover {
     color: var(--primary-color);
+    background: rgba(29, 78, 216, 0.08);
+}
+
+.nav-link.active {
+    color: #0f172a;
+    background: rgba(29, 78, 216, 0.08);
+}
+
+.nav-link-pill {
+    border: 1px solid rgba(214, 223, 233, 0.95);
+    background: rgba(255, 255, 255, 0.78);
+}
+
+.nav-link-pill.active {
+    color: white;
+    background: linear-gradient(135deg, #1d4ed8, #0f766e);
+    border-color: transparent;
 }
 
 .user-profile {
@@ -97,5 +119,11 @@
     .navbar {
         margin: 1rem;
         padding: 1rem;
+    }
+
+    .user-menu {
+        gap: 0.75rem;
+        flex-wrap: wrap;
+        justify-content: flex-end;
     }
 }

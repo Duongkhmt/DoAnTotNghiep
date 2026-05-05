@@ -1,32 +1,26 @@
 import React from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, NavLink } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
-import { FiLogOut, FiUser } from 'react-icons/fi';
+import { FiCpu, FiLogOut, FiUser } from 'react-icons/fi';
 import './Navbar.css';
 
 const Navbar = ({ onOpenAuth }) => {
     const { currentUser, logout } = useAuth();
-    const navigate = useNavigate();
 
     const handleLogout = async (e) => {
-        // Ngăn chặn các sự kiện mặc định của trình duyệt gây lag
         e?.preventDefault();
 
-        // 1. DỌN SẠCH FRONTEND NGAY LẬP TỨC (Không cần đợi Backend phản hồi)
         localStorage.removeItem('accessToken');
         localStorage.removeItem('user');
 
         try {
-            // 2. Gửi lệnh báo Backend vô hiệu hóa Token
             await logout();
         } catch (error) {
-            console.log("Bỏ qua lỗi từ Backend");
+            console.log('Ignore backend logout error');
         } finally {
-            // 3. Force F5 toàn bộ trang đích để xóa hẳn bộ nhớ đệm React
             window.location.href = '/';
         }
     };
-
 
     return (
         <nav className="navbar glass-panel">
@@ -39,7 +33,12 @@ const Navbar = ({ onOpenAuth }) => {
             <div className="navbar-actions">
                 {currentUser ? (
                     <div className="user-menu">
-                        <Link to="/dashboard" className="nav-link">Dashboard</Link>
+                        <NavLink to="/dashboard" className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}>
+                            Dashboard
+                        </NavLink>
+                        <NavLink to="/ai-screening" className={({ isActive }) => `nav-link nav-link-pill ${isActive ? 'active' : ''}`}>
+                            <FiCpu /> AI Screening
+                        </NavLink>
                         <Link to="/profile" className="user-profile" style={{ textDecoration: 'none' }}>
                             <div className="avatar">
                                 {currentUser.avatarUrl ? (

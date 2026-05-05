@@ -18,8 +18,8 @@ const ALL_COLUMNS = [
     { id: 'avgMatchedBuy', label: 'KL TB khớp mua', defaultVisible: true },
     { id: 'avgMatchedSell', label: 'KL TB khớp bán', defaultVisible: true },
     { id: 'matchedRatio', label: 'Hệ số khớp bán/mua', defaultVisible: true },
-    { id: 'foreignBuyVal', label: 'GT NN mua', defaultVisible: true },
-    { id: 'foreignSellVal', label: 'GT NN bán', defaultVisible: true },
+    { id: 'foreignBuyVol', label: 'KL NN mua', defaultVisible: true },
+    { id: 'foreignSellVol', label: 'KL NN bán', defaultVisible: true },
     { id: 'cancelBuyValue', label: 'KL hủy mua', defaultVisible: true },
     { id: 'cancelSellValue', label: 'KL hủy bán', defaultVisible: true },
     { id: 'avgCancelBuy', label: 'KL TB hủy mua', defaultVisible: true },
@@ -162,8 +162,8 @@ const StockHistoryTable = ({ symbol, date, onSymbolChange, onDateChange }) => {
                                 {visibleColumns.avgMatchedBuy && <th className="bg-col-group1">KL TB khớp mua</th>}
                                 {visibleColumns.avgMatchedSell && <th className="bg-col-group1">KL TB khớp bán</th>}
                                 {visibleColumns.matchedRatio && <th className="bg-col-group2 highlight-col">Hệ số khớp bán/mua</th>}
-                                {visibleColumns.foreignBuyVal && <th className="bg-col-group1">GT NN mua</th>}
-                                {visibleColumns.foreignSellVal && <th className="bg-col-group2">GT NN bán</th>}
+                                {visibleColumns.foreignBuyVol && <th className="bg-col-group1">KL NN mua</th>}
+                                {visibleColumns.foreignSellVol && <th className="bg-col-group2">KL NN bán</th>}
                                 {visibleColumns.cancelBuyValue && <th className="bg-col-group2">KL hủy mua</th>}
                                 {visibleColumns.cancelSellValue && <th className="bg-col-group2">KL hủy bán</th>}
                                 {visibleColumns.avgCancelBuy && <th className="bg-col-group2">KL TB hủy mua</th>}
@@ -198,8 +198,8 @@ const StockHistoryTable = ({ symbol, date, onSymbolChange, onDateChange }) => {
                                             {row.matchedRatio !== null && row.matchedRatio !== undefined ? Number(row.matchedRatio).toFixed(2) : '-'}
                                         </td>
                                     )}
-                                    {visibleColumns.foreignBuyVal && <td className="text-right bg-col-group1">{fmtNum(row.foreignBuyVal)}</td>}
-                                    {visibleColumns.foreignSellVal && <td className="text-right bg-col-group2">{fmtNum(row.foreignSellVal)}</td>}
+                                    {visibleColumns.foreignBuyVol && <td className="text-right bg-col-group1">{fmtNum(row.foreignBuyVol)}</td>}
+                                    {visibleColumns.foreignSellVol && <td className="text-right bg-col-group2">{fmtNum(row.foreignSellVol)}</td>}
                                     {visibleColumns.cancelBuyValue && <td className="text-right bg-col-group2">{fmtNum(row.cancelBuyValue)}</td>}
                                     {visibleColumns.cancelSellValue && <td className="text-right bg-col-group2">{fmtNum(row.cancelSellValue)}</td>}
                                     {visibleColumns.avgCancelBuy && <td className="text-right bg-col-group2">{fmtNum(row.avgCancelBuy)}</td>}
