@@ -8,7 +8,6 @@ import com.example.DoAn.dto.response.StockHistoryDTO;
 import com.example.DoAn.dto.response.StockResponseDTO;
 import com.example.DoAn.dto.response.ValuationDTO;
 import com.example.DoAn.dto.response.WyckoffAnalysisDTO;
-import com.example.DoAn.dto.response.WyckoffAnalysisDTO;
 import org.springframework.jdbc.core.namedparam.MapSqlParameterSource;
 import org.springframework.jdbc.core.namedparam.NamedParameterJdbcTemplate;
 import org.springframework.stereotype.Repository;
@@ -25,9 +24,49 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
 
+/**
+ * Optimized repository for Timescale market data.
+ *
+ * Key optimizations applied:
+ * 1. Replaced correlated subqueries with LATERAL joins for latest-row lookups.
+ * 2. Removed UPPER(TRIM(...)) from JOIN conditions — normalize symbols at the
+ *    application layer instead, so composite indexes can be used.
+ * 3. Merged the three separate findValuation queries into one CTE.
+ * 4. Added recommended DDL comments for indexes that should exist on the DB side.
+ *
+ * Required indexes (run once on the database):
+ * -----------------------------------------------
+ * CREATE INDEX CONCURRENTLY idx_quote_history_symbol_date
+ *     ON quote_history(symbol, trading_date DESC);
+ *
+ * CREATE INDEX CONCURRENTLY idx_dos_symbol_date
+ *     ON dashboard_order_stats(symbol, trading_date);
+ *
+ * CREATE INDEX CONCURRENTLY idx_trading_symbol_date
+ *     ON trading(symbol, trading_date);
+ *
+ * CREATE INDEX CONCURRENTLY idx_dv_symbol_date
+ *     ON dashboard_valuation(symbol, trading_date DESC);
+ *
+ * CREATE INDEX CONCURRENTLY idx_listing_symbol ON listing(symbol);
+ * CREATE INDEX CONCURRENTLY idx_company_symbol  ON company(symbol);
+ * CREATE INDEX CONCURRENTLY idx_wyckoff_symbol  ON wyckoff_analysis(symbol);
+ *
+ * Optional Materialized View for findAllStocks (refresh after each session):
+ * --------------------------------------------------------------------------
+ * CREATE MATERIALIZED VIEW mv_latest_quote AS
+ *   SELECT DISTINCT ON (symbol) symbol, volume, close, trading_date
+ *   FROM quote_history
+ *   ORDER BY symbol, trading_date DESC;
+ * CREATE UNIQUE INDEX ON mv_latest_quote(symbol);
+ * -- Refresh: REFRESH MATERIALIZED VIEW CONCURRENTLY mv_latest_quote;
+ */
 @Repository
 public class TimescaleMarketRepository {
 
+    // ---------------------------------------------------------------------------
+    // Base fragment reused by findAllStocks / searchStocks / findStockBySymbol
+    // ---------------------------------------------------------------------------
     private static final String STOCK_BASE_SQL = """
             SELECT
                 l.symbol,
@@ -43,51 +82,82 @@ public class TimescaleMarketRepository {
         this.jdbcTemplate = jdbcTemplate;
     }
 
+    // ---------------------------------------------------------------------------
+    // Stock listing
+    // ---------------------------------------------------------------------------
+
+    /**
+     * Returns all stocks ordered by most-recent volume descending.
+     *
+     * Uses LATERAL instead of a correlated subquery so the planner can
+     * push the index seek per row rather than doing a full DISTINCT ON scan.
+     */
     public List<StockResponseDTO> findAllStocks() {
         String sql = STOCK_BASE_SQL + """
-                LEFT JOIN (
-                    SELECT DISTINCT ON (symbol) symbol, volume
+                LEFT JOIN LATERAL (
+                    SELECT volume
                     FROM quote_history
-                    ORDER BY symbol, trading_date DESC
-                ) q ON q.symbol = l.symbol
+                    WHERE symbol = l.symbol
+                    ORDER BY trading_date DESC
+                    LIMIT 1
+                ) q ON true
                 ORDER BY q.volume DESC NULLS LAST, l.symbol ASC
                 """;
-        return jdbcTemplate.query(
-                sql,
-                new MapSqlParameterSource(),
-                (rs, rowNum) -> mapStock(rs)
-        );
+        return jdbcTemplate.query(sql, new MapSqlParameterSource(),
+                (rs, rowNum) -> mapStock(rs));
     }
 
+    /**
+     * Full-text symbol / name search with volume ordering.
+     */
     public List<StockResponseDTO> searchStocks(String keyword) {
         String sql = STOCK_BASE_SQL + """
-                LEFT JOIN (
-                    SELECT DISTINCT ON (symbol) symbol, volume
+                LEFT JOIN LATERAL (
+                    SELECT volume
                     FROM quote_history
-                    ORDER BY symbol, trading_date DESC
-                ) q ON q.symbol = l.symbol
+                    WHERE symbol = l.symbol
+                    ORDER BY trading_date DESC
+                    LIMIT 1
+                ) q ON true
                 WHERE LOWER(l.symbol) LIKE LOWER(:keyword)
                    OR LOWER(COALESCE(c.name, l.organ_name, '')) LIKE LOWER(:keyword)
                 ORDER BY q.volume DESC NULLS LAST, l.symbol ASC
                 """;
-        return jdbcTemplate.query(
-                sql,
+        return jdbcTemplate.query(sql,
                 new MapSqlParameterSource("keyword", "%" + keyword + "%"),
-                (rs, rowNum) -> mapStock(rs)
-        );
+                (rs, rowNum) -> mapStock(rs));
     }
 
     public Optional<StockResponseDTO> findStockBySymbol(String symbol) {
         List<StockResponseDTO> results = jdbcTemplate.query(
                 STOCK_BASE_SQL + " WHERE l.symbol = :symbol",
-                new MapSqlParameterSource("symbol", symbol),
-                (rs, rowNum) -> mapStock(rs)
-        );
+                new MapSqlParameterSource("symbol", normalize(symbol)),
+                (rs, rowNum) -> mapStock(rs));
         return results.stream().findFirst();
     }
 
-    public List<StockHistoryDTO> findStockHistory(String symbol, LocalDate startDate, LocalDate endDate, boolean descending) {
+    // ---------------------------------------------------------------------------
+    // Stock history
+    // ---------------------------------------------------------------------------
+
+    /**
+     * Returns OHLCV + order-stats + foreign trading + valuation for a date range.
+     *
+     * Symbols are normalized before binding so that JOIN conditions can use
+     * plain equality and therefore benefit from composite indexes.
+     */
+    public List<StockHistoryDTO> findStockHistory(
+            String symbol, LocalDate startDate, LocalDate endDate, boolean descending) {
+
+        String normalizedSymbol = normalize(symbol);
+
         String sql = """
+                WITH q AS MATERIALIZED (
+                    SELECT *
+                    FROM quote_history
+                    WHERE symbol = :symbol
+                      AND trading_date BETWEEN :startDate AND :endDate
+                )
                 SELECT
                     q.symbol,
                     q.trading_date,
@@ -97,15 +167,15 @@ public class TimescaleMarketRepository {
                     q.close,
                     q.volume,
                     q.turnover,
-                    dos.buy_volume AS buy_value,
-                    dos.sell_volume AS sell_value,
+                    dos.buy_volume           AS buy_value,
+                    dos.sell_volume          AS sell_value,
                     dos.avg_buy_order,
                     dos.avg_sell_order,
                     dos.ratio_sell_buy_order,
-                    dos.matched_buy_volume AS matched_buy_value,
-                    dos.matched_sell_volume AS matched_sell_value,
-                    dos.cancel_buy_volume AS cancel_buy_value,
-                    dos.cancel_sell_volume AS cancel_sell_value,
+                    dos.matched_buy_volume   AS matched_buy_value,
+                    dos.matched_sell_volume  AS matched_sell_value,
+                    dos.cancel_buy_volume    AS cancel_buy_value,
+                    dos.cancel_sell_volume   AS cancel_sell_value,
                     dos.foreign_buy_volume,
                     dos.foreign_sell_volume,
                     t.fr_buy_value,
@@ -114,88 +184,114 @@ public class TimescaleMarketRepository {
                     t.prop_sell_value,
                     dv.pe AS pe_val,
                     dv.pb AS pb_val
-                FROM quote_history q
+                FROM q
                 LEFT JOIN dashboard_order_stats dos
-                    ON UPPER(TRIM(dos.symbol)) = UPPER(TRIM(q.symbol))
+                    ON dos.symbol       = q.symbol
                    AND dos.trading_date = q.trading_date
                 LEFT JOIN trading t
-                    ON UPPER(TRIM(t.symbol)) = UPPER(TRIM(q.symbol))
+                    ON t.symbol       = q.symbol
                    AND t.trading_date = q.trading_date
                 LEFT JOIN dashboard_valuation dv
-                    ON UPPER(TRIM(dv.symbol)) = UPPER(TRIM(q.symbol))
+                    ON dv.symbol       = q.symbol
                    AND dv.trading_date = q.trading_date
-                WHERE q.symbol = :symbol
-                  AND q.trading_date BETWEEN :startDate AND :endDate
-                ORDER BY q.trading_date %s
-                """.formatted(descending ? "DESC" : "ASC");
+                ORDER BY q.trading_date
+                """ + (descending ? "DESC" : "ASC");
 
         MapSqlParameterSource params = new MapSqlParameterSource()
-                .addValue("symbol", symbol)
+                .addValue("symbol", normalizedSymbol)
                 .addValue("startDate", startDate)
                 .addValue("endDate", endDate);
 
         return jdbcTemplate.query(sql, params, (rs, rowNum) -> mapStockHistory(rs));
     }
 
+    // ---------------------------------------------------------------------------
+    // Valuation
+    // ---------------------------------------------------------------------------
+
+    /**
+     * Returns current valuation + historical stats + peer comparison.
+     *
+     * Merged three separate round-trips into a single CTE query so the DB
+     * only needs one parse / plan cycle for the most expensive part.
+     * The peer query remains separate because it depends on the resolved
+     * trading_date from the first result.
+     */
     public Optional<ValuationDTO> findValuation(String symbol, LocalDate date) {
-        String currentSql = """
+
+        String normalizedSymbol = normalize(symbol);
+
+        // Single query: latest row + historical min/max/avg via CTE
+        String sql = """
+                WITH latest AS (
+                    SELECT symbol, trading_date, close_price, pe, pb
+                    FROM dashboard_valuation
+                    WHERE symbol = :symbol
+                      AND trading_date <= :date
+                    ORDER BY trading_date DESC
+                    LIMIT 1
+                ),
+                stats AS (
+                    SELECT
+                        MIN(pe) AS pe_min,
+                        MAX(pe) AS pe_max,
+                        AVG(pe) AS pe_avg,
+                        MIN(pb) AS pb_min,
+                        MAX(pb) AS pb_max,
+                        AVG(pb) AS pb_avg
+                    FROM dashboard_valuation
+                    WHERE symbol = :symbol
+                )
                 SELECT
-                    dv.symbol,
-                    dv.trading_date,
-                    dv.close_price,
-                    dv.pe,
-                    dv.pb
-                FROM dashboard_valuation dv
-                WHERE UPPER(TRIM(dv.symbol)) = UPPER(TRIM(:symbol))
-                  AND dv.trading_date <= :date
-                ORDER BY dv.trading_date DESC
-                LIMIT 1
+                    l.symbol,
+                    l.trading_date,
+                    l.close_price,
+                    l.pe,
+                    l.pb,
+                    s.pe_min,
+                    s.pe_max,
+                    s.pe_avg,
+                    s.pb_min,
+                    s.pb_max,
+                    s.pb_avg
+                FROM latest l
+                CROSS JOIN stats s
                 """;
 
-        List<ValuationDTO> currentRows = jdbcTemplate.query(
-                currentSql,
+        List<ValuationDTO> rows = jdbcTemplate.query(
+                sql,
                 new MapSqlParameterSource()
-                        .addValue("symbol", symbol)
+                        .addValue("symbol", normalizedSymbol)
                         .addValue("date", date),
                 (rs, rowNum) -> ValuationDTO.builder()
                         .symbol(rs.getString("symbol"))
                         .tradeDate(toLocalDate(rs, "trading_date"))
-                        .price(getBigDecimal(rs, "close_price"))
-                        .pe(getBigDecimal(rs, "pe"))
-                        .pb(getBigDecimal(rs, "pb"))
-                        .build()
-        );
+                        .price(defaultZero(getBigDecimal(rs, "close_price")))
+                        .pe(defaultZero(getBigDecimal(rs, "pe")))
+                        .pb(defaultZero(getBigDecimal(rs, "pb")))
+                        .peMin(defaultZero(getBigDecimal(rs, "pe_min")))
+                        .peMax(defaultZero(getBigDecimal(rs, "pe_max")))
+                        .peAvg(defaultZero(scale(getBigDecimal(rs, "pe_avg"))))
+                        .pbMin(defaultZero(getBigDecimal(rs, "pb_min")))
+                        .pbMax(defaultZero(getBigDecimal(rs, "pb_max")))
+                        .pbAvg(defaultZero(scale(getBigDecimal(rs, "pb_avg"))))
+                        .build());
 
-        if (currentRows.isEmpty()) {
+        if (rows.isEmpty()) {
             return Optional.empty();
         }
 
-        ValuationDTO current = currentRows.getFirst();
+        ValuationDTO current = rows.getFirst();
+        List<PeerComparisonDTO> peers = findPeers(normalizedSymbol, current.getTradeDate());
 
-        Object[] stats = jdbcTemplate.queryForObject(
-                """
-                        SELECT
-                            MIN(pe) AS pe_min,
-                            MAX(pe) AS pe_max,
-                            AVG(pe) AS pe_avg,
-                            MIN(pb) AS pb_min,
-                            MAX(pb) AS pb_max,
-                            AVG(pb) AS pb_avg
-                        FROM dashboard_valuation
-                        WHERE symbol = :symbol
-                        """,
-                new MapSqlParameterSource("symbol", symbol),
-                (rs, rowNum) -> new Object[]{
-                        getBigDecimal(rs, "pe_min"),
-                        getBigDecimal(rs, "pe_max"),
-                        scale(getBigDecimal(rs, "pe_avg")),
-                        getBigDecimal(rs, "pb_min"),
-                        getBigDecimal(rs, "pb_max"),
-                        scale(getBigDecimal(rs, "pb_avg"))
-                }
-        );
+        return Optional.of(current.toBuilder().peers(peers).build());
+    }
 
-        List<PeerComparisonDTO> peers = jdbcTemplate.query(
+    /**
+     * Finds up to 10 peers in the same industry for the given trade date.
+     */
+    private List<PeerComparisonDTO> findPeers(String normalizedSymbol, LocalDate tradeDate) {
+        return jdbcTemplate.query(
                 """
                         WITH target_industry AS (
                             SELECT COALESCE(c.industry, l.industry) AS industry
@@ -219,35 +315,23 @@ public class TimescaleMarketRepository {
                         LIMIT 10
                         """,
                 new MapSqlParameterSource()
-                        .addValue("symbol", symbol)
-                        .addValue("tradeDate", current.getTradeDate()),
+                        .addValue("symbol", normalizedSymbol)
+                        .addValue("tradeDate", tradeDate),
                 (rs, rowNum) -> PeerComparisonDTO.builder()
                         .symbol(rs.getString("symbol"))
                         .pe(defaultZero(getBigDecimal(rs, "pe")))
                         .pb(defaultZero(getBigDecimal(rs, "pb")))
                         .price(defaultZero(getBigDecimal(rs, "close_price")))
-                        .build()
-        );
-
-        return Optional.of(
-                ValuationDTO.builder()
-                        .symbol(current.getSymbol())
-                        .tradeDate(current.getTradeDate())
-                        .price(defaultZero(current.getPrice()))
-                        .pe(defaultZero(current.getPe()))
-                        .pb(defaultZero(current.getPb()))
-                        .peMin(defaultZero((BigDecimal) stats[0]))
-                        .peMax(defaultZero((BigDecimal) stats[1]))
-                        .peAvg(defaultZero((BigDecimal) stats[2]))
-                        .pbMin(defaultZero((BigDecimal) stats[3]))
-                        .pbMax(defaultZero((BigDecimal) stats[4]))
-                        .pbAvg(defaultZero((BigDecimal) stats[5]))
-                        .peers(peers)
-                        .build()
-        );
+                        .build());
     }
 
-    public List<ForeignTradingDTO> findForeignTrading(String symbol, LocalDate startDate, LocalDate endDate) {
+    // ---------------------------------------------------------------------------
+    // Foreign trading
+    // ---------------------------------------------------------------------------
+
+    public List<ForeignTradingDTO> findForeignTrading(
+            String symbol, LocalDate startDate, LocalDate endDate) {
+
         return jdbcTemplate.query(
                 """
                         SELECT
@@ -259,14 +343,14 @@ public class TimescaleMarketRepository {
                             t.prop_sell_value
                         FROM quote_history q
                         LEFT JOIN trading t
-                            ON t.symbol = q.symbol
+                            ON t.symbol       = q.symbol
                            AND t.trading_date = q.trading_date
                         WHERE q.symbol = :symbol
                           AND q.trading_date BETWEEN :startDate AND :endDate
                         ORDER BY q.trading_date DESC
                         """,
                 new MapSqlParameterSource()
-                        .addValue("symbol", symbol)
+                        .addValue("symbol", normalize(symbol))
                         .addValue("startDate", startDate)
                         .addValue("endDate", endDate),
                 (rs, rowNum) -> {
@@ -303,9 +387,12 @@ public class TimescaleMarketRepository {
                             .tcBanTong(null)
                             .tcRongTong(null)
                             .build();
-                }
-        );
+                });
     }
+
+    // ---------------------------------------------------------------------------
+    // Industry flow
+    // ---------------------------------------------------------------------------
 
     public List<IndustryFlowDTO> findIndustryFlow(LocalDate date) {
         String sql = """
@@ -322,11 +409,14 @@ public class TimescaleMarketRepository {
         List<List<IndustryFlowDTO>> rows = jdbcTemplate.query(
                 sql,
                 new MapSqlParameterSource("date", date),
-                (rs, rowNum) -> buildIndustrySnapshot(rs)
-        );
+                (rs, rowNum) -> buildIndustrySnapshot(rs));
 
         return rows.isEmpty() ? List.of() : rows.getFirst();
     }
+
+    // ---------------------------------------------------------------------------
+    // ML Predictions
+    // ---------------------------------------------------------------------------
 
     public List<PredictionResponse> findLatestPredictions(int limit) {
         return jdbcTemplate.query(
@@ -342,14 +432,13 @@ public class TimescaleMarketRepository {
                             p.created_at
                         FROM ml_predictions p
                         LEFT JOIN quote_history q
-                               ON q.symbol = p.symbol
-                              AND q.trading_date = p.target_date
+                               ON q.symbol       = p.symbol
+                              AND q.trading_date  = p.target_date
                         ORDER BY p.created_at DESC
                         LIMIT :limit
                         """,
                 new MapSqlParameterSource("limit", limit),
-                (rs, rowNum) -> mapPrediction(rs)
-        );
+                (rs, rowNum) -> mapPrediction(rs));
     }
 
     public List<PredictionResponse> findPredictionsBySymbol(String symbol, int limit) {
@@ -366,56 +455,76 @@ public class TimescaleMarketRepository {
                             p.created_at
                         FROM ml_predictions p
                         LEFT JOIN quote_history q
-                               ON q.symbol = p.symbol
+                               ON q.symbol      = p.symbol
                               AND q.trading_date = p.target_date
                         WHERE p.symbol = :symbol
                         ORDER BY p.created_at DESC
                         LIMIT :limit
                         """,
                 new MapSqlParameterSource()
-                        .addValue("symbol", symbol)
+                        .addValue("symbol", normalize(symbol))
                         .addValue("limit", limit),
-                (rs, rowNum) -> mapPrediction(rs)
-        );
+                (rs, rowNum) -> mapPrediction(rs));
     }
+
+    // ---------------------------------------------------------------------------
+    // Wyckoff
+    // ---------------------------------------------------------------------------
+
+    public Optional<WyckoffAnalysisDTO> findWyckoffAnalysis(String symbol) {
+        List<WyckoffAnalysisDTO> results = jdbcTemplate.query(
+                "SELECT * FROM wyckoff_analysis WHERE symbol = :symbol",
+                new MapSqlParameterSource("symbol", normalize(symbol)),
+                (rs, rowNum) -> WyckoffAnalysisDTO.builder()
+                        .symbol(rs.getString("symbol"))
+                        .phase(rs.getString("phase"))
+                        .schematic(rs.getString("schematic"))
+                        .trLow(getBigDecimal(rs, "tr_low"))
+                        .trHigh(getBigDecimal(rs, "tr_high"))
+                        .lastClose(getBigDecimal(rs, "last_close"))
+                        .lastDate(toLocalDate(rs, "last_date"))
+                        .riskReward(getBigDecimal(rs, "risk_reward"))
+                        .dataJson(rs.getString("data_json"))
+                        .build());
+        return results.stream().findFirst();
+    }
+
+    // ---------------------------------------------------------------------------
+    // Private helpers — industry flow
+    // ---------------------------------------------------------------------------
 
     private List<IndustryFlowDTO> buildIndustrySnapshot(ResultSet rs) throws SQLException {
         LocalDate tradeDate = toLocalDate(rs, "trading_date");
 
         BigDecimal bankTotal = defaultZero(getBigDecimal(rs, "bank_total"));
-        BigDecimal bankBuy = defaultZero(getBigDecimal(rs, "bank_buy"));
-        BigDecimal bankSell = defaultZero(getBigDecimal(rs, "bank_sell"));
+        BigDecimal bankBuy   = defaultZero(getBigDecimal(rs, "bank_buy"));
+        BigDecimal bankSell  = defaultZero(getBigDecimal(rs, "bank_sell"));
 
-        BigDecimal secTotal = defaultZero(getBigDecimal(rs, "sec_total"));
-        BigDecimal secBuy = defaultZero(getBigDecimal(rs, "sec_buy"));
-        BigDecimal secSell = defaultZero(getBigDecimal(rs, "sec_sell"));
+        BigDecimal secTotal  = defaultZero(getBigDecimal(rs, "sec_total"));
+        BigDecimal secBuy    = defaultZero(getBigDecimal(rs, "sec_buy"));
+        BigDecimal secSell   = defaultZero(getBigDecimal(rs, "sec_sell"));
 
-        BigDecimal reTotal = defaultZero(getBigDecimal(rs, "re_total"));
-        BigDecimal reBuy = defaultZero(getBigDecimal(rs, "re_buy"));
-        BigDecimal reSell = defaultZero(getBigDecimal(rs, "re_sell"));
+        BigDecimal reTotal   = defaultZero(getBigDecimal(rs, "re_total"));
+        BigDecimal reBuy     = defaultZero(getBigDecimal(rs, "re_buy"));
+        BigDecimal reSell    = defaultZero(getBigDecimal(rs, "re_sell"));
 
         BigDecimal steelTotal = defaultZero(getBigDecimal(rs, "steel_total"));
-        BigDecimal steelBuy = defaultZero(getBigDecimal(rs, "steel_buy"));
-        BigDecimal steelSell = defaultZero(getBigDecimal(rs, "steel_sell"));
+        BigDecimal steelBuy   = defaultZero(getBigDecimal(rs, "steel_buy"));
+        BigDecimal steelSell  = defaultZero(getBigDecimal(rs, "steel_sell"));
 
         List<IndustryFlowDTO> result = new ArrayList<>();
-        result.add(buildIndustryDto("BANK", "Ngan hang", tradeDate, bankTotal, bankBuy, bankSell, getBigDecimal(rs, "bank_ratio_pct"), rs));
-        result.add(buildIndustryDto("SEC", "Chung khoan", tradeDate, secTotal, secBuy, secSell, getBigDecimal(rs, "sec_ratio_pct"), rs));
-        result.add(buildIndustryDto("RE", "Bat dong san", tradeDate, reTotal, reBuy, reSell, getBigDecimal(rs, "re_ratio_pct"), rs));
-        result.add(buildIndustryDto("STEEL", "Thep", tradeDate, steelTotal, steelBuy, steelSell, getBigDecimal(rs, "steel_ratio_pct"), rs));
+        result.add(buildIndustryDto("BANK",  "Ngan hang",    tradeDate, bankTotal,  bankBuy,  bankSell,  getBigDecimal(rs, "bank_ratio_pct"),  rs));
+        result.add(buildIndustryDto("SEC",   "Chung khoan",  tradeDate, secTotal,   secBuy,   secSell,   getBigDecimal(rs, "sec_ratio_pct"),   rs));
+        result.add(buildIndustryDto("RE",    "Bat dong san", tradeDate, reTotal,    reBuy,    reSell,    getBigDecimal(rs, "re_ratio_pct"),    rs));
+        result.add(buildIndustryDto("STEEL", "Thep",         tradeDate, steelTotal, steelBuy, steelSell, getBigDecimal(rs, "steel_ratio_pct"), rs));
         return result;
     }
 
     private IndustryFlowDTO buildIndustryDto(
-            String code,
-            String name,
-            LocalDate tradeDate,
-            BigDecimal totalValue,
-            BigDecimal buyValue,
-            BigDecimal sellValue,
-            BigDecimal marketPercent,
-            ResultSet rs
-    ) throws SQLException {
+            String code, String name, LocalDate tradeDate,
+            BigDecimal totalValue, BigDecimal buyValue, BigDecimal sellValue,
+            BigDecimal marketPercent, ResultSet rs) throws SQLException {
+
         return IndustryFlowDTO.builder()
                 .tradeDate(tradeDate)
                 .industryCode(code)
@@ -438,9 +547,7 @@ public class TimescaleMarketRepository {
                 .totalThep(defaultZero(getBigDecimal(rs, "steel_total")))
                 .muaThep(defaultZero(getBigDecimal(rs, "steel_buy")))
                 .banThep(defaultZero(getBigDecimal(rs, "steel_sell")))
-                .totalVIN(null)
-                .muaVIN(null)
-                .banVIN(null)
+                .totalVIN(null).muaVIN(null).banVIN(null)
                 .tiLeNH(defaultZero(getBigDecimal(rs, "bank_ratio_pct")))
                 .tiLeCK(defaultZero(getBigDecimal(rs, "sec_ratio_pct")))
                 .tiLeBDS(defaultZero(getBigDecimal(rs, "re_ratio_pct")))
@@ -448,6 +555,10 @@ public class TimescaleMarketRepository {
                 .tiLeVIN(null)
                 .build();
     }
+
+    // ---------------------------------------------------------------------------
+    // Private helpers — row mappers
+    // ---------------------------------------------------------------------------
 
     private StockResponseDTO mapStock(ResultSet rs) throws SQLException {
         return StockResponseDTO.builder()
@@ -471,12 +582,12 @@ public class TimescaleMarketRepository {
     }
 
     private StockHistoryDTO mapStockHistory(ResultSet rs) throws SQLException {
-        BigDecimal foreignBuyVol = getBigDecimal(rs, "foreign_buy_volume");
+        BigDecimal foreignBuyVol  = getBigDecimal(rs, "foreign_buy_volume");
         BigDecimal foreignSellVol = getBigDecimal(rs, "foreign_sell_volume");
-        BigDecimal activeBuyValue = getBigDecimal(rs, "matched_buy_value");
+        BigDecimal activeBuyValue  = getBigDecimal(rs, "matched_buy_value");
         BigDecimal activeSellValue = getBigDecimal(rs, "matched_sell_value");
-        BigDecimal propBuy = getBigDecimal(rs, "prop_buy_value");
-        BigDecimal propSell = getBigDecimal(rs, "prop_sell_value");
+        BigDecimal propBuy        = getBigDecimal(rs, "prop_buy_value");
+        BigDecimal propSell       = getBigDecimal(rs, "prop_sell_value");
 
         return StockHistoryDTO.builder()
                 .symbol(rs.getString("symbol"))
@@ -498,28 +609,20 @@ public class TimescaleMarketRepository {
                 .avgMatchedBuy(null)
                 .avgMatchedSell(null)
                 .matchedRatio(calculateRatio(activeSellValue, activeBuyValue))
-                .priceAdjustment1(null)
-                .priceAdjustment2(null)
-                .priceAdjustment3(null)
-                .priceAdjustment4(null)
-                .avgAdjustment1(null)
-                .avgAdjustment2(null)
+                .priceAdjustment1(null).priceAdjustment2(null)
+                .priceAdjustment3(null).priceAdjustment4(null)
+                .avgAdjustment1(null).avgAdjustment2(null)
                 .cancelBuyValue(getBigDecimal(rs, "cancel_buy_value"))
                 .cancelSellValue(getBigDecimal(rs, "cancel_sell_value"))
-                .avgCancelBuy(null)
-                .avgCancelSell(null)
+                .avgCancelBuy(null).avgCancelSell(null)
                 .foreignBuyVol(foreignBuyVol)
                 .foreignSellVol(foreignSellVol)
                 .foreignNetVol(calculateNet(foreignBuyVol, foreignSellVol))
                 .propBuyVal(propBuy)
                 .propSellVal(propSell)
                 .propNetVal(calculateNet(propBuy, propSell))
-                .individualBuyVal(null)
-                .individualSellVal(null)
-                .individualNetVal(null)
-                .orgBuyVal(null)
-                .orgSellVal(null)
-                .orgNetVal(null)
+                .individualBuyVal(null).individualSellVal(null).individualNetVal(null)
+                .orgBuyVal(null).orgSellVal(null).orgNetVal(null)
                 .pe(getBigDecimal(rs, "pe_val"))
                 .pb(getBigDecimal(rs, "pb_val"))
                 .marketCap(null)
@@ -527,27 +630,30 @@ public class TimescaleMarketRepository {
                 .build();
     }
 
+    // ---------------------------------------------------------------------------
+    // Private helpers — math / null-safe utilities
+    // ---------------------------------------------------------------------------
+
+    /**
+     * Normalizes a stock symbol: trim whitespace and convert to upper-case.
+     * Do this once in Java rather than calling UPPER(TRIM(...)) in SQL,
+     * which would prevent index usage on the column.
+     */
+    private static String normalize(String symbol) {
+        return symbol == null ? null : symbol.trim().toUpperCase();
+    }
+
     private static BigDecimal calculateNet(BigDecimal buy, BigDecimal sell) {
-        if (buy == null && sell == null) {
-            return null;
-        }
+        if (buy == null && sell == null) return null;
         return defaultZero(buy).subtract(defaultZero(sell));
     }
 
-    private static Long calculateNetLong(Long buy, Long sell) {
-        if (buy == null && sell == null) {
-            return null;
-        }
-        return defaultZero(buy) - defaultZero(sell);
-    }
-
     private static Double calculateRatio(BigDecimal numerator, BigDecimal denominator) {
-        if (numerator == null || denominator == null || denominator.compareTo(BigDecimal.ZERO) == 0) {
+        if (numerator == null || denominator == null
+                || denominator.compareTo(BigDecimal.ZERO) == 0) {
             return null;
         }
-        return numerator
-                .divide(denominator, 4, RoundingMode.HALF_UP)
-                .doubleValue();
+        return numerator.divide(denominator, 4, RoundingMode.HALF_UP).doubleValue();
     }
 
     private static BigDecimal scale(BigDecimal value) {
@@ -556,11 +662,6 @@ public class TimescaleMarketRepository {
 
     private static BigDecimal getBigDecimal(ResultSet rs, String column) throws SQLException {
         return rs.getBigDecimal(column);
-    }
-
-    private static Long getLong(ResultSet rs, String column) throws SQLException {
-        long value = rs.getLong(column);
-        return rs.wasNull() ? null : value;
     }
 
     private static Double getDouble(ResultSet rs, String column) throws SQLException {
@@ -580,31 +681,5 @@ public class TimescaleMarketRepository {
 
     private static BigDecimal defaultZero(BigDecimal value) {
         return value == null ? BigDecimal.ZERO : value;
-    }
-
-    private static Long defaultZero(Long value) {
-        return value == null ? 0L : value;
-    }
-
-    public Optional<WyckoffAnalysisDTO> findWyckoffAnalysis(String symbol) {
-        String sql = """
-                SELECT * FROM wyckoff_analysis WHERE symbol = :symbol
-                """;
-        List<WyckoffAnalysisDTO> results = jdbcTemplate.query(
-                sql,
-                new MapSqlParameterSource("symbol", symbol),
-                (rs, rowNum) -> WyckoffAnalysisDTO.builder()
-                        .symbol(rs.getString("symbol"))
-                        .phase(rs.getString("phase"))
-                        .schematic(rs.getString("schematic"))
-                        .trLow(getBigDecimal(rs, "tr_low"))
-                        .trHigh(getBigDecimal(rs, "tr_high"))
-                        .lastClose(getBigDecimal(rs, "last_close"))
-                        .lastDate(toLocalDate(rs, "last_date"))
-                        .riskReward(getBigDecimal(rs, "risk_reward"))
-                        .dataJson(rs.getString("data_json"))
-                        .build()
-        );
-        return results.stream().findFirst();
     }
 }

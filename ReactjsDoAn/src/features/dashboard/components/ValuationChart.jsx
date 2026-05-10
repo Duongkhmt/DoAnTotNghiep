@@ -39,7 +39,8 @@ const ValuationChart = ({ symbol, date, onSymbolChange, onDateChange }) => {
                 // Fetch history separately
                 marketService.getStockHistoryByDateRange(symbol, startDate, endDate)
                     .then(history => {
-                        const sortedHistory = [...history].sort(
+                        const historyArray = Array.isArray(history) ? history : [];
+                        const sortedHistory = [...historyArray].sort(
                             (a, b) => new Date(a.tradeDate) - new Date(b.tradeDate)
                         );
                         setHistoryData(sortedHistory);

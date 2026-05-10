@@ -27,7 +27,8 @@ const WyckoffChart = ({ symbol, date, onSymbolChange, onDateChange }) => {
                     marketService.getWyckoffAnalysis(symbol)
                 ]);
 
-                const sortedHistory = [...history].sort((a, b) => new Date(a.tradeDate) - new Date(b.tradeDate));
+                const historyArray = Array.isArray(history) ? history : [];
+                const sortedHistory = [...historyArray].sort((a, b) => new Date(a.tradeDate) - new Date(b.tradeDate));
                 setHistoryData(sortedHistory);
                 setWyckoffData(wyckoff);
             } catch (error) {
@@ -83,7 +84,12 @@ const WyckoffChart = ({ symbol, date, onSymbolChange, onDateChange }) => {
         const volMa20 = calcMA(volume, 20);
         const rsi14 = calcRSI(close, 14);
 
-        const parsedData = wyckoffData?.dataJson ? JSON.parse(wyckoffData.dataJson) : {};
+        let parsedData = {};
+        try {
+            parsedData = wyckoffData?.dataJson ? JSON.parse(wyckoffData.dataJson) : {};
+        } catch (e) {
+            console.error('Error parsing wyckoff dataJson', e);
+        }
         const events = parsedData.events || [];
 
         const eventConfig = {
@@ -268,9 +274,17 @@ const WyckoffChart = ({ symbol, date, onSymbolChange, onDateChange }) => {
                     <div className="narrative-box" style={{ marginTop: '20px', padding: '15px', background: '#111', borderRadius: '8px', border: '1px solid #222' }}>
                         <h4 style={{ color: '#2196f3', marginBottom: '10px' }}>Nhận định:</h4>
                         <div style={{ color: '#aaa', fontSize: '0.9rem', lineHeight: '1.6' }}>
-                            {JSON.parse(wyckoffData.dataJson).narrative_vi.split('\n').map((line, i) => (
-                                <p key={i}>{line}</p>
-                            ))}
+                            {(() => {
+                                try {
+                                    const parsed = JSON.parse(wyckoffData.dataJson);
+                                    const narrative = parsed.narrative_vi || 'Không có nhận định chi tiết.';
+                                    return narrative.split('\n').map((line, i) => (
+                                        <p key={i}>{line}</p>
+                                    ));
+                                } catch (e) {
+                                    return <p>Lỗi hiển thị nhận định.</p>;
+                                }
+                            })()}
                         </div>
                     </div>
                 )}

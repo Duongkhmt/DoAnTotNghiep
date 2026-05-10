@@ -25,6 +25,7 @@ import {
 } from 'react-icons/fi';
 import marketService from '../services/market.service';
 import './DashboardViews.css';
+import TradingViewChart from './TradingViewChart';
 
 const SIGNAL_OPTIONS = ['ALL', 'MUA_MANH', 'MUA', 'TRUNG_TINH', 'BAN', 'BAN_MANH'];
 const SIGNAL_COLORS = {
@@ -203,7 +204,11 @@ const PredictionPanel = ({ symbol, onSymbolChange }) => {
     const priceChartData = useMemo(() => (
         priceHistory.map((item) => ({
             tradingDate: item.trading_date,
+            open: item.open,
+            high: item.high,
+            low: item.low,
             close: item.close,
+            volume: item.volume,
             sma20: item.sma_20,
             sma50: item.sma_50
         }))
@@ -455,21 +460,7 @@ const PredictionPanel = ({ symbol, onSymbolChange }) => {
                             <div className="mini-chart-card">
                                 <h4>Price + trend lines</h4>
                                 <div style={{ width: '100%', height: 220 }}>
-                                    <ResponsiveContainer width="100%" height="100%">
-                                        <LineChart data={priceChartData}>
-                                            <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e2e8f0" />
-                                            <XAxis dataKey="tradingDate" tickFormatter={(value) => formatDate(value, 'dd/MM')} stroke="#475569" fontSize={11} />
-                                            <YAxis stroke="#475569" fontSize={11} tickFormatter={(value) => formatNumber(value, 0)} domain={['auto', 'auto']} />
-                                            <Tooltip
-                                                formatter={(value, name) => [formatNumber(value, 2), name]}
-                                                labelFormatter={(label) => formatDate(label)}
-                                            />
-                                            <Legend />
-                                            <Line type="monotone" dataKey="close" stroke="#1d4ed8" dot={false} strokeWidth={2.5} name="Close" />
-                                            <Line type="monotone" dataKey="sma20" stroke="#0f766e" dot={false} strokeWidth={2} name="SMA 20" />
-                                            <Line type="monotone" dataKey="sma50" stroke="#b45309" dot={false} strokeWidth={2} name="SMA 50" />
-                                        </LineChart>
-                                    </ResponsiveContainer>
+                                    <TradingViewChart data={priceChartData} />
                                 </div>
                             </div>
 
@@ -530,17 +521,18 @@ const PredictionPanel = ({ symbol, onSymbolChange }) => {
                             <LineChart data={dailyWinRate}>
                                 <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e2e8f0" />
                                 <XAxis dataKey="predict_date" tickFormatter={(value) => formatDate(value, 'dd/MM')} stroke="#475569" fontSize={12} />
-                                <YAxis stroke="#475569" fontSize={12} tickFormatter={(value) => `${value}%`} />
+                                <YAxis yAxisId="left" stroke="#475569" fontSize={12} tickFormatter={(value) => `${(value * 100).toFixed(0)}%`} domain={[0, 1]} />
+                                <YAxis yAxisId="right" orientation="right" stroke="#475569" fontSize={12} />
                                 <Tooltip
                                     formatter={(value, name) => [
-                                        name === 'win_rate' ? formatPercent(value, 2) : formatNumber(value, 0),
+                                        name === 'win_rate' ? formatPercent(value * 100, 2) : formatNumber(value, 0),
                                         name === 'win_rate' ? 'Win Rate' : 'Total Predictions'
                                     ]}
                                     labelFormatter={(label) => formatDate(label)}
                                 />
                                 <Legend />
-                                <Line type="monotone" dataKey="win_rate" stroke="#1d4ed8" strokeWidth={3} dot={{ r: 3 }} name="win_rate" />
-                                <Line type="monotone" dataKey="total_predictions" stroke="#0f766e" strokeWidth={2} dot={false} name="total_predictions" />
+                                <Line yAxisId="left" type="monotone" dataKey="win_rate" stroke="#1d4ed8" strokeWidth={3} dot={{ r: 3 }} name="win_rate" />
+                                <Line yAxisId="right" type="monotone" dataKey="total_predictions" stroke="#0f766e" strokeWidth={2} dot={false} name="total_predictions" />
                             </LineChart>
                         </ResponsiveContainer>
                     ) : (

@@ -9,6 +9,7 @@ import IndustryFlowTable from '../features/dashboard/components/IndustryFlowTabl
 import NewsSection from '../features/dashboard/components/NewsSection';
 import StockSidebar from '../features/dashboard/components/StockSidebar';
 import WyckoffChart from '../features/dashboard/components/WyckoffChart';
+import ErrorBoundary from '../components/ErrorBoundary';
 import './Dashboard.css';
 
 const Dashboard = () => {
@@ -84,27 +85,29 @@ const Dashboard = () => {
                     <StockSidebar selectedSymbol={symbol} onSelectSymbol={setSymbol} />
 
                     <div className="tab-content custom-scrollbar" style={{ flex: 1, padding: '1rem 1.5rem', overflowY: 'auto', display: 'flex', flexDirection: 'column', height: '100%' }}>
-                        {activeTab === 'DINH_GIA' && (
-                            <ValuationChart symbol={symbol} date={date} onSymbolChange={setSymbol} onDateChange={setDate} />
-                        )}
+                        <ErrorBoundary>
+                            {activeTab === 'DINH_GIA' && (
+                                <ValuationChart symbol={symbol} date={date} onSymbolChange={setSymbol} onDateChange={setDate} />
+                            )}
 
-                        {activeTab === 'HE_SO' && (
-                            <StockHistoryTable symbol={symbol} date={date} onSymbolChange={setSymbol} onDateChange={setDate} />
-                        )}
+                            {activeTab === 'HE_SO' && (
+                                <StockHistoryTable symbol={symbol} date={date} onSymbolChange={setSymbol} onDateChange={setDate} />
+                            )}
 
-                        {activeTab === 'KHOI_NGOAI' && (
-                            <ForeignTradingTable symbol={symbol} date={date} onSymbolChange={setSymbol} onDateChange={setDate} />
-                        )}
+                            {activeTab === 'KHOI_NGOAI' && (
+                                <ForeignTradingTable symbol={symbol} date={date} onSymbolChange={setSymbol} onDateChange={setDate} />
+                            )}
 
-                        {activeTab === 'DONG_TIEN' && (
-                            <IndustryFlowTable date={date} onDateChange={setDate} />
-                        )}
+                            {activeTab === 'DONG_TIEN' && (
+                                <IndustryFlowTable date={date} onDateChange={setDate} />
+                            )}
 
-                        {activeTab === 'WYCKOFF' && (
-                            <WyckoffChart symbol={symbol} date={date} onSymbolChange={setSymbol} onDateChange={setDate} />
-                        )}
+                            {activeTab === 'WYCKOFF' && (
+                                <WyckoffChart symbol={symbol} date={date} onSymbolChange={setSymbol} onDateChange={setDate} />
+                            )}
 
-                        {activeTab === 'TIN_TUC' && <NewsSection />}
+                            {activeTab === 'TIN_TUC' && <NewsSection />}
+                        </ErrorBoundary>
                     </div>
                 </div>
             </main>

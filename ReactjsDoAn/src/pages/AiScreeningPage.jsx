@@ -3,6 +3,7 @@ import { Navigate, useNavigate, useSearchParams } from 'react-router-dom';
 import Navbar from '../layouts/Navbar';
 import { useAuth } from '../contexts/AuthContext';
 import PredictionPanel from '../features/dashboard/components/PredictionPanel';
+import ErrorBoundary from '../components/ErrorBoundary';
 import './AiScreeningPage.css';
 
 const AiScreeningPage = () => {
@@ -44,7 +45,9 @@ const AiScreeningPage = () => {
                 </section>
 
                 <section className="ai-page-workspace">
-                    <PredictionPanel symbol={symbol} onSymbolChange={setSymbol} />
+                    <ErrorBoundary>
+                        <PredictionPanel symbol={symbol} onSymbolChange={setSymbol} />
+                    </ErrorBoundary>
                 </section>
             </main>
         </div>
