@@ -40,8 +40,10 @@ public class MarketController {
     @GetMapping("/industry-flow")
     public ResponseEntity<List<IndustryFlowDTO>> getIndustryFlow(
             @RequestParam(required = false)
-            @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate date) {
+            @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate date,
+            @RequestParam(defaultValue = "30") int limit,
+            @RequestParam(defaultValue = "0") int offset) {
         LocalDate effectiveDate = date != null ? date : LocalDate.now();
-        return ResponseEntity.ok(marketService.getIndustryFlowByDate(effectiveDate));
+        return ResponseEntity.ok(marketService.getIndustryFlowHistory(effectiveDate, limit, offset));
     }
 }

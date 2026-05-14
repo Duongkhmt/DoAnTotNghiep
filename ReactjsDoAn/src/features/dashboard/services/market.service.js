@@ -79,9 +79,9 @@ class MarketService {
         }).then((res) => res.data);
     }
 
-    getIndustryFlow(date) {
+    getIndustryFlow(date, limit = 30, offset = 0) {
         return api.get('/market/industry-flow', {
-            params: { date }
+            params: { date, limit, offset }
         }).then((res) => res.data);
     }
 

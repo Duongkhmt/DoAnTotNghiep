@@ -923,3 +923,66 @@
         width: 100%;
     }
 }
+
+/* Industry History Table Styles */
+.industry-history-table {
+    border-spacing: 0;
+}
+
+.industry-history-table thead tr.main-header th {
+    top: 0;
+    z-index: 25;
+    background: #0f172a;
+    font-size: 0.85rem;
+    padding: 0.6rem;
+    text-align: center;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.industry-history-table thead tr.sub-header th {
+    top: 38px;
+    z-index: 24;
+    font-size: 0.72rem;
+    padding: 0.4rem;
+    background: #1e293b;
+    border-top: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.industry-history-table th.bg-nh { background-color: #3b82f6 !important; }
+.industry-history-table th.bg-ck { background-color: #8b5cf6 !important; }
+.industry-history-table th.bg-bds { background-color: #f59e0b !important; }
+.industry-history-table th.bg-thep { background-color: #10b981 !important; }
+.industry-history-table th.bg-vin { background-color: #ef4444 !important; }
+.industry-history-table th.bg-ratio { background-color: #6366f1 !important; }
+
+.industry-history-table td {
+    padding: 0.6rem 0.75rem;
+    border-right: 1px solid rgba(255, 255, 255, 0.05);
+    background: #111827;
+    color: #e5e7eb;
+}
+
+.industry-history-table td.bg-purple {
+    background-color: #7c3aed !important;
+    color: white !important;
+}
+
+.industry-history-table tr:hover td {
+    background-color: #1f2937 !important;
+}
+
+.sticky-col {
+    position: sticky !important;
+    left: 0;
+    z-index: 30 !important;
+    background: #0f172a !important;
+}
+
+.industry-history-table td:first-child {
+    position: sticky;
+    left: 0;
+    z-index: 10;
+    background: #111827;
+    font-weight: 700;
+}
+

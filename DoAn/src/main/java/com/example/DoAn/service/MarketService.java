@@ -30,6 +30,10 @@ public class MarketService {
         return timescaleMarketRepository.findIndustryFlow(date);
     }
 
+    public List<IndustryFlowDTO> getIndustryFlowHistory(LocalDate date, int limit, int offset) {
+        return timescaleMarketRepository.findIndustryFlowHistory(date, limit, offset);
+    }
+
     public List<StockHistoryDTO> getStockHistoryByDateRange(String symbol, LocalDate startDate, LocalDate endDate) {
         if (startDate == null || endDate == null || startDate.isAfter(endDate)) {
             throw new ApplicationException(ErrorCode.INVALID_KEY);

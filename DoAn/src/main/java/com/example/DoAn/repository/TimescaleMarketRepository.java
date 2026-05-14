@@ -406,12 +406,28 @@ public class TimescaleMarketRepository {
                 LIMIT 1
                 """;
 
-        List<List<IndustryFlowDTO>> rows = jdbcTemplate.query(
+        return jdbcTemplate.query(
                 sql,
                 new MapSqlParameterSource("date", date),
-                (rs, rowNum) -> buildIndustrySnapshot(rs));
+                (rs, rowNum) -> mapIndustryFlowSnapshot(rs));
+    }
 
-        return rows.isEmpty() ? List.of() : rows.getFirst();
+    public List<IndustryFlowDTO> findIndustryFlowHistory(LocalDate date, int limit, int offset) {
+        MapSqlParameterSource params = new MapSqlParameterSource();
+        params.addValue("limit", limit);
+        params.addValue("offset", offset);
+
+        StringBuilder sql = new StringBuilder("SELECT * FROM dashboard_industry_flow ");
+        if (date != null) {
+            sql.append("WHERE trading_date <= CAST(:date AS DATE) ");
+            params.addValue("date", Date.valueOf(date));
+        }
+        sql.append("ORDER BY trading_date DESC LIMIT :limit OFFSET :offset");
+
+        return jdbcTemplate.query(
+                sql.toString(),
+                params,
+                (rs, rowNum) -> mapIndustryFlowSnapshot(rs));
     }
 
     // ---------------------------------------------------------------------------
@@ -493,9 +509,8 @@ public class TimescaleMarketRepository {
     // Private helpers — industry flow
     // ---------------------------------------------------------------------------
 
-    private List<IndustryFlowDTO> buildIndustrySnapshot(ResultSet rs) throws SQLException {
+    private IndustryFlowDTO mapIndustryFlowSnapshot(ResultSet rs) throws SQLException {
         LocalDate tradeDate = toLocalDate(rs, "trading_date");
-
         BigDecimal bankTotal = defaultZero(getBigDecimal(rs, "bank_total"));
         BigDecimal bankBuy   = defaultZero(getBigDecimal(rs, "bank_buy"));
         BigDecimal bankSell  = defaultZero(getBigDecimal(rs, "bank_sell"));
@@ -512,49 +527,36 @@ public class TimescaleMarketRepository {
         BigDecimal steelBuy   = defaultZero(getBigDecimal(rs, "steel_buy"));
         BigDecimal steelSell  = defaultZero(getBigDecimal(rs, "steel_sell"));
 
-        List<IndustryFlowDTO> result = new ArrayList<>();
-        result.add(buildIndustryDto("BANK",  "Ngan hang",    tradeDate, bankTotal,  bankBuy,  bankSell,  getBigDecimal(rs, "bank_ratio_pct"),  rs));
-        result.add(buildIndustryDto("SEC",   "Chung khoan",  tradeDate, secTotal,   secBuy,   secSell,   getBigDecimal(rs, "sec_ratio_pct"),   rs));
-        result.add(buildIndustryDto("RE",    "Bat dong san", tradeDate, reTotal,    reBuy,    reSell,    getBigDecimal(rs, "re_ratio_pct"),    rs));
-        result.add(buildIndustryDto("STEEL", "Thep",         tradeDate, steelTotal, steelBuy, steelSell, getBigDecimal(rs, "steel_ratio_pct"), rs));
-        return result;
-    }
-
-    private IndustryFlowDTO buildIndustryDto(
-            String code, String name, LocalDate tradeDate,
-            BigDecimal totalValue, BigDecimal buyValue, BigDecimal sellValue,
-            BigDecimal marketPercent, ResultSet rs) throws SQLException {
+        BigDecimal vinTotal = defaultZero(getBigDecimal(rs, "vin_total"));
+        BigDecimal vinBuy   = defaultZero(getBigDecimal(rs, "vin_buy"));
+        BigDecimal vinSell  = defaultZero(getBigDecimal(rs, "vin_sell"));
 
         return IndustryFlowDTO.builder()
                 .tradeDate(tradeDate)
-                .industryCode(code)
-                .industryName(name)
-                .totalValue(totalValue)
-                .buyValue(buyValue)
-                .sellValue(sellValue)
-                .netValue(buyValue.subtract(sellValue))
-                .marketPercent(defaultZero(marketPercent))
-                .changePercent(null)
-                .totalNH(defaultZero(getBigDecimal(rs, "bank_total")))
-                .muaNH(defaultZero(getBigDecimal(rs, "bank_buy")))
-                .banNH(defaultZero(getBigDecimal(rs, "bank_sell")))
-                .totalCK(defaultZero(getBigDecimal(rs, "sec_total")))
-                .muaCK(defaultZero(getBigDecimal(rs, "sec_buy")))
-                .banCK(defaultZero(getBigDecimal(rs, "sec_sell")))
-                .totalBDS(defaultZero(getBigDecimal(rs, "re_total")))
-                .muaBDS(defaultZero(getBigDecimal(rs, "re_buy")))
-                .banBDS(defaultZero(getBigDecimal(rs, "re_sell")))
-                .totalThep(defaultZero(getBigDecimal(rs, "steel_total")))
-                .muaThep(defaultZero(getBigDecimal(rs, "steel_buy")))
-                .banThep(defaultZero(getBigDecimal(rs, "steel_sell")))
-                .totalVIN(null).muaVIN(null).banVIN(null)
+                .totalValue(defaultZero(getBigDecimal(rs, "market_total_val")))
+                .totalNH(bankTotal)
+                .muaNH(bankBuy)
+                .banNH(bankSell)
                 .tiLeNH(defaultZero(getBigDecimal(rs, "bank_ratio_pct")))
+                .totalCK(secTotal)
+                .muaCK(secBuy)
+                .banCK(secSell)
                 .tiLeCK(defaultZero(getBigDecimal(rs, "sec_ratio_pct")))
+                .totalBDS(reTotal)
+                .muaBDS(reBuy)
+                .banBDS(reSell)
                 .tiLeBDS(defaultZero(getBigDecimal(rs, "re_ratio_pct")))
+                .totalThep(steelTotal)
+                .muaThep(steelBuy)
+                .banThep(steelSell)
                 .tiLeThep(defaultZero(getBigDecimal(rs, "steel_ratio_pct")))
-                .tiLeVIN(null)
+                .totalVIN(vinTotal)
+                .muaVIN(vinBuy)
+                .banVIN(vinSell)
+                .tiLeVIN(defaultZero(getBigDecimal(rs, "vin_ratio_pct")))
                 .build();
     }
+
 
     // ---------------------------------------------------------------------------
     // Private helpers — row mappers
