@@ -14,7 +14,10 @@ const StockSidebar = ({ selectedSymbol, onSelectSymbol }) => {
             setLoading(true);
             try {
                 const data = await marketService.getAllStocks();
-                const stocksData = data || [];
+                const stocksData = (data || []).filter(stock => {
+                    const s = typeof stock === 'string' ? stock : (stock.symbol || '');
+                    return s !== 'VNINDEX';
+                });
                 setStocks(stocksData);
                 
                 // Tự động chọn mã đầu tiên nếu chưa có mã nào được chọn
@@ -39,7 +42,11 @@ const StockSidebar = ({ selectedSymbol, onSelectSymbol }) => {
                 const data = searchKeyword.trim()
                     ? await marketService.searchStocks(searchKeyword)
                     : await marketService.getAllStocks();
-                setStocks(data || []);
+                const filteredData = (data || []).filter(stock => {
+                    const s = typeof stock === 'string' ? stock : (stock.symbol || '');
+                    return s !== 'VNINDEX';
+                });
+                setStocks(filteredData);
             } catch (error) {
                 console.error('Failed to search stocks:', error);
             } finally {

@@ -51,12 +51,24 @@ export const AuthProvider = ({ children }) => {
         }
     };
 
+    const refreshUser = async () => {
+        try {
+            const user = await userService.getMyInfo();
+            localStorage.setItem('user', JSON.stringify(user));
+            setCurrentUser(user);
+            return user;
+        } catch (error) {
+            console.error("Lỗi khi làm mới thông tin người dùng:", error);
+        }
+    };
+
     const value = {
         currentUser,
         login,
         register,
         logout,
-        handleGoogleLoginCallback
+        handleGoogleLoginCallback,
+        refreshUser
     };
 
     return (

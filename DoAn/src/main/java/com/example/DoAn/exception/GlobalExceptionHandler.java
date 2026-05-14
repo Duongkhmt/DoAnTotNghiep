@@ -1,5 +1,6 @@
 package com.example.DoAn.exception;
 
+import com.example.DoAn.exception.ai.AiIntegrationException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.validation.ObjectError;
@@ -36,6 +37,17 @@ public class GlobalExceptionHandler {
 
         return ResponseEntity.status(errorCode.getHttpStatusCode().value())
                 .body(errorResponse);
+    }
+
+    @ExceptionHandler(AiIntegrationException.class)
+    public ResponseEntity<ErrorResponse> handleAiIntegrationException(AiIntegrationException ex) {
+        ErrorResponse errorResponse = ErrorResponse.builder()
+                .code(ErrorCode.AI_SERVICE_ERROR.getCode())
+                .message(ex.getMessage())
+                .status(ex.getStatusCode().value())
+                .build();
+
+        return ResponseEntity.status(ex.getStatusCode().value()).body(errorResponse);
     }
 
     @ExceptionHandler(IllegalArgumentException.class)

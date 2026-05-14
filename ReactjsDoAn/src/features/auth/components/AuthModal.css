@@ -4,42 +4,48 @@
     left: 0;
     width: 100vw;
     height: 100vh;
-    background: rgba(0, 0, 0, 0.6);
-    backdrop-filter: blur(4px);
-    -webkit-backdrop-filter: blur(4px);
+    background: rgba(0, 0, 0, 0.7);
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
     display: flex;
     align-items: center;
     justify-content: center;
     z-index: 1000;
-    padding: 1rem;
+    padding: 1.5rem;
 }
 
 .modal-content {
     width: 100%;
-    max-width: 450px;
-    max-height: 90vh;
+    max-width: 500px;
+    max-height: 92vh;
     overflow-y: auto;
     position: relative;
-    padding: 2.5rem;
-    animation: slideUp 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+    padding: 3rem;
+    border-radius: 28px;
+    background: var(--card-bg);
+    backdrop-filter: var(--glass-blur);
+    -webkit-backdrop-filter: var(--glass-blur);
+    border: 1px solid var(--card-border);
+    box-shadow: var(--glass-shadow);
+    animation: slideUp 0.4s cubic-bezier(0.16, 1, 0.3, 1);
 }
+
 
 /* Custom Scrollbar for Modal */
 .modal-content::-webkit-scrollbar {
-    width: 6px;
+    width: 5px;
 }
 
 .modal-content::-webkit-scrollbar-thumb {
-    background: var(--card-border);
-    border-radius: 4px;
+    background: rgba(255, 255, 255, 0.1);
+    border-radius: 10px;
 }
 
 @keyframes slideUp {
     from {
         opacity: 0;
-        transform: translateY(20px) scale(0.95);
+        transform: translateY(30px) scale(0.95);
     }
-
     to {
         opacity: 1;
         transform: translateY(0) scale(1);
@@ -51,68 +57,104 @@
     top: 1.5rem;
     right: 1.5rem;
     color: var(--text-muted);
-    transition: color 0.2s ease;
-    background: rgba(0, 0, 0, 0.05);
-    border-radius: 50%;
-    padding: 0.5rem;
+    transition: all 0.2s ease;
+    background: rgba(255, 255, 255, 0.05);
+    border-radius: 12px;
+    padding: 0.6rem;
     display: flex;
 }
 
 .close-btn:hover {
-    color: var(--text-color);
-    background: rgba(0, 0, 0, 0.1);
+    color: var(--text-primary);
+    background: rgba(255, 255, 255, 0.1);
+    transform: rotate(90deg);
 }
 
 .modal-header {
     text-align: center;
-    margin-bottom: 2rem;
+    margin-bottom: 2.5rem;
 }
 
 .modal-header h2 {
-    font-size: 1.75rem;
-    font-weight: 700;
-    margin-bottom: 0.5rem;
+    font-size: 2rem; /* Increased from 1.75rem */
+    font-weight: 800;
+    margin-bottom: 0.75rem;
+    letter-spacing: -0.5px;
 }
 
 .modal-header p {
-    color: var(--text-muted);
-    font-size: 0.95rem;
+    color: var(--text-secondary);
+    font-size: 1rem;
+    line-height: 1.5;
 }
 
 /* Input Styles */
+.auth-form {
+    display: flex;
+    flex-direction: column;
+    gap: 1.25rem;
+}
+
+.form-group {
+    margin-bottom: 0;
+}
+
+.form-label {
+    display: block;
+    margin-bottom: 0.625rem;
+    font-weight: 600;
+    font-size: 0.9rem;
+    color: var(--text-secondary);
+}
+
 .input-with-icon {
     position: relative;
 }
 
 .input-icon {
     position: absolute;
-    left: 1rem;
+    left: 1.125rem;
     top: 50%;
     transform: translateY(-50%);
     color: var(--text-muted);
-    font-size: 1.1rem;
+    font-size: 1.2rem;
 }
 
 .input-with-icon .input-field {
-    padding-left: 2.75rem;
+    padding-left: 3rem;
+    height: 3.5rem; /* Taller inputs */
+    font-size: 1rem;
+    border-radius: 14px;
+    background: rgba(255, 255, 255, 0.03);
+    border-color: rgba(255, 255, 255, 0.08);
+}
+
+.input-with-icon .input-field:focus {
+    background: rgba(255, 255, 255, 0.06);
+    border-color: var(--primary);
+    box-shadow: 0 0 0 4px rgba(99, 102, 241, 0.15);
 }
 
 .auth-submit {
     width: 100%;
     margin-top: 1rem;
-    padding: 0.875rem;
-    font-size: 1.05rem;
+    padding: 1rem;
+    font-size: 1.1rem;
+    height: 3.5rem;
+    font-weight: 700;
+    border-radius: 14px;
 }
 
 .error-message {
-    background: rgba(239, 68, 68, 0.1);
-    border: 1px solid rgba(239, 68, 68, 0.3);
-    color: #fca5a5;
-    padding: 0.75rem;
-    border-radius: 8px;
+    background: rgba(244, 63, 94, 0.1);
+    border: 1px solid rgba(244, 63, 94, 0.2);
+    color: #fda4af;
+    padding: 0.875rem;
+    border-radius: 12px;
     margin-bottom: 1.5rem;
     font-size: 0.9rem;
     text-align: center;
+    font-weight: 500;
 }
 
 /* Divider */
@@ -120,27 +162,28 @@
     display: flex;
     align-items: center;
     text-align: center;
-    margin: 1.5rem 0;
+    margin: 2rem 0;
     color: var(--text-muted);
     font-size: 0.875rem;
+    font-weight: 500;
 }
 
 .divider::before,
 .divider::after {
     content: '';
     flex: 1;
-    border-bottom: 1px solid var(--card-border);
+    border-bottom: 1px solid rgba(255, 255, 255, 0.08);
 }
 
 .divider span {
-    padding: 0 1rem;
+    padding: 0 1.25rem;
 }
 
 /* Social Buttons */
 .social-auth {
     display: flex;
     gap: 1rem;
-    margin-bottom: 1.5rem;
+    margin-bottom: 2rem;
 }
 
 .btn-social {
@@ -148,41 +191,39 @@
     display: flex;
     align-items: center;
     justify-content: center;
-    gap: 0.5rem;
-    padding: 0.75rem;
-    border-radius: 8px;
-    font-weight: 500;
-    font-size: 0.95rem;
-    background: var(--input-bg);
-    border: 1px solid var(--card-border);
-    color: var(--text-color);
-    transition: all 0.2s ease;
+    gap: 0.75rem;
+    height: 3.5rem;
+    border-radius: 14px;
+    font-weight: 600;
+    font-size: 1rem;
+    background: rgba(255, 255, 255, 0.05);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    color: var(--text-primary);
+    transition: all 0.3s ease;
 }
 
 .btn-social:hover {
-    background: rgba(0, 0, 0, 0.05);
+    background: rgba(255, 255, 255, 0.08);
+    border-color: rgba(255, 255, 255, 0.2);
     transform: translateY(-2px);
-}
-
-.btn-social.google:hover {
-    border-color: rgba(0, 0, 0, 0.1);
 }
 
 .auth-footer {
     text-align: center;
     color: var(--text-muted);
-    font-size: 0.9rem;
-    margin-top: 1.5rem;
+    font-size: 0.95rem;
+    margin-top: 1rem;
 }
 
 .toggle-auth {
-    color: var(--primary-color);
-    font-weight: 600;
+    color: var(--primary);
+    font-weight: 700;
     cursor: pointer;
-    transition: color 0.2s ease;
+    margin-left: 4px;
+    transition: all 0.2s ease;
 }
 
 .toggle-auth:hover {
-    text-decoration: underline;
     color: var(--primary-hover);
-}
+    text-decoration: underline;
+}

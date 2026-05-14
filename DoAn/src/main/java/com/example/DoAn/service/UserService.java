@@ -2,6 +2,7 @@ package com.example.DoAn.service;
 
 import com.example.DoAn.dto.LoginGoogleDTO;
 import com.example.DoAn.dto.request.UserCreateRequest;
+import com.example.DoAn.dto.request.UserUpdateRequest;
 import com.example.DoAn.dto.response.UserResponse;
 import com.example.DoAn.entity.User;
 import com.example.DoAn.exception.*;
@@ -11,6 +12,14 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
+import org.springframework.web.multipart.MultipartFile;
+
+import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
+import java.nio.file.StandardCopyOption;
+import java.util.UUID;
 
 @Service
 @RequiredArgsConstructor
@@ -67,6 +76,46 @@ public class UserService {
         User user = userRepository.findByEmail(name)
                 .orElseThrow(() -> new ApplicationException(ErrorCode.USER_NOT_EXISTED));
         return userMapper.toUserResponse(user);
+    }
+
+    public UserResponse updateMyInfo(UserUpdateRequest request) {
+        var context = SecurityContextHolder.getContext();
+        String name = context.getAuthentication().getName();
+        User user = userRepository.findByEmail(name)
+                .orElseThrow(() -> new ApplicationException(ErrorCode.USER_NOT_EXISTED));
+
+        user.setUsername(request.getUsername());
+        user.setAddress(request.getAddress());
+        user.setPhoneNumber(request.getPhoneNumber());
+
+        return userMapper.toUserResponse(userRepository.save(user));
+    }
+
+    public UserResponse updateAvatar(MultipartFile file) {
+        var context = SecurityContextHolder.getContext();
+        String name = context.getAuthentication().getName();
+        User user = userRepository.findByEmail(name)
+                .orElseThrow(() -> new ApplicationException(ErrorCode.USER_NOT_EXISTED));
+
+        try {
+            String fileName = UUID.randomUUID().toString() + "_" + file.getOriginalFilename();
+            Path uploadPath = Paths.get("uploads/avatars");
+
+            if (!Files.exists(uploadPath)) {
+                Files.createDirectories(uploadPath);
+            }
+
+            Path filePath = uploadPath.resolve(fileName);
+            Files.copy(file.getInputStream(), filePath, StandardCopyOption.REPLACE_EXISTING);
+
+            // Lưu URL vào DB (đường dẫn tương đối phục vụ API)
+            String avatarUrl = "/api/users/images/" + fileName;
+            user.setAvatarUrl(avatarUrl);
+
+            return userMapper.toUserResponse(userRepository.save(user));
+        } catch (IOException e) {
+            throw new ApplicationException(ErrorCode.UNCATEGORIZED_EXCEPTION);
+        }
     }
 
 }

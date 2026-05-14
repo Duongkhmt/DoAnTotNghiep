@@ -41,6 +41,7 @@ public class SecurityConfig {
                                 "/auth/**",
                                 "/oauth2/**", // Endpoint mặc định của Google Login
                                 "/api/news/**",
+                                "/api/users/images/**",
                                 "/swagger-ui/**",
                                 "/v3/api-docs/**"
                         ).permitAll()

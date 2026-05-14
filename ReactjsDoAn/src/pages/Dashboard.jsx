@@ -37,54 +37,53 @@ const Dashboard = () => {
         <div className="dashboard-container">
             <Navbar />
 
-            <main
-                className="dashboard-content"
-                style={{ padding: 0, display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0 }}
-            >
-                <nav className="dashboard-nav-tabs">
-                    <button className="tab-btn">Dashboard</button>
-                    <button
-                        className={`tab-btn ${activeTab === 'HE_SO' ? 'active' : ''}`}
-                        onClick={() => setActiveTab('HE_SO')}
-                    >
-                        He so
-                    </button>
-                    <button
-                        className={`tab-btn ${activeTab === 'DINH_GIA' ? 'active' : ''}`}
-                        onClick={() => setActiveTab('DINH_GIA')}
-                    >
-                        Dinh gia
-                    </button>
-                    <button
-                        className={`tab-btn ${activeTab === 'TIN_TUC' ? 'active' : ''}`}
-                        onClick={() => setActiveTab('TIN_TUC')}
-                    >
-                        Tin tuc
-                    </button>
-                    <button
-                        className={`tab-btn ${activeTab === 'DONG_TIEN' ? 'active' : ''}`}
-                        onClick={() => setActiveTab('DONG_TIEN')}
-                    >
-                        Dong tien nganh
-                    </button>
-                    <button
-                        className={`tab-btn ${activeTab === 'KHOI_NGOAI' ? 'active' : ''}`}
-                        onClick={() => setActiveTab('KHOI_NGOAI')}
-                    >
-                        Mua ban cac khoi
-                    </button>
-                    <button
-                        className={`tab-btn ${activeTab === 'WYCKOFF' ? 'active' : ''}`}
-                        onClick={() => setActiveTab('WYCKOFF')}
-                    >
-                        Wyckoff + VSA
-                    </button>
-                </nav>
+            <main className="dashboard-content">
+                <div className="dashboard-header-tabs">
+                    <nav className="dashboard-nav-tabs">
+                        <button className="tab-btn">Dashboard</button>
+                        <button
+                            className={`tab-btn ${activeTab === 'HE_SO' ? 'active' : ''}`}
+                            onClick={() => setActiveTab('HE_SO')}
+                        >
+                            Hệ số
+                        </button>
+                        <button
+                            className={`tab-btn ${activeTab === 'DINH_GIA' ? 'active' : ''}`}
+                            onClick={() => setActiveTab('DINH_GIA')}
+                        >
+                            Định giá
+                        </button>
+                        <button
+                            className={`tab-btn ${activeTab === 'TIN_TUC' ? 'active' : ''}`}
+                            onClick={() => setActiveTab('TIN_TUC')}
+                        >
+                            Tin tức
+                        </button>
+                        <button
+                            className={`tab-btn ${activeTab === 'DONG_TIEN' ? 'active' : ''}`}
+                            onClick={() => setActiveTab('DONG_TIEN')}
+                        >
+                            Dòng tiền ngành
+                        </button>
+                        <button
+                            className={`tab-btn ${activeTab === 'KHOI_NGOAI' ? 'active' : ''}`}
+                            onClick={() => setActiveTab('KHOI_NGOAI')}
+                        >
+                            Mua bán các khối
+                        </button>
+                        <button
+                            className={`tab-btn ${activeTab === 'WYCKOFF' ? 'active' : ''}`}
+                            onClick={() => setActiveTab('WYCKOFF')}
+                        >
+                            Wyckoff + VSA
+                        </button>
+                    </nav>
+                </div>
 
-                <div className="dashboard-body" style={{ display: 'flex', flex: 1, overflow: 'hidden' }}>
+                <div className="dashboard-body">
                     <StockSidebar selectedSymbol={symbol} onSelectSymbol={setSymbol} />
 
-                    <div className="tab-content custom-scrollbar" style={{ flex: 1, padding: '1rem 1.5rem', overflowY: 'auto', display: 'flex', flexDirection: 'column', height: '100%' }}>
+                    <div className="tab-content custom-scrollbar">
                         <ErrorBoundary>
                             {activeTab === 'DINH_GIA' && (
                                 <ValuationChart symbol={symbol} date={date} onSymbolChange={setSymbol} onDateChange={setDate} />
@@ -113,6 +112,7 @@ const Dashboard = () => {
             </main>
         </div>
     );
+
 };
 
 export default Dashboard;

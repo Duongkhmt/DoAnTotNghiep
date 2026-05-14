@@ -74,8 +74,8 @@ const AuthModal = ({ isOpen, onClose, initialMode = 'login' }) => {
                 </button>
 
                 <div className="modal-header">
-                    <h2>{isLogin ? 'Welcome Back' : 'Create Account'}</h2>
-                    <p>{isLogin ? 'Sign in to access your dashboard' : 'Join us to get started'}</p>
+                    <h2>{isLogin ? 'Chào mừng quay trở lại' : 'Tạo tài khoản mới'}</h2>
+                    <p>{isLogin ? 'Đăng nhập để truy cập bảng điều khiển của bạn' : 'Tham gia cùng chúng tôi để bắt đầu đầu tư'}</p>
                 </div>
 
                 {error && <div className="error-message">{error}</div>}
@@ -83,7 +83,7 @@ const AuthModal = ({ isOpen, onClose, initialMode = 'login' }) => {
                 <form onSubmit={handleSubmit} className="auth-form">
                     {!isLogin && (
                         <div className="form-group">
-                            <label className="form-label">Full Name</label>
+                            <label className="form-label">Họ và tên</label>
                             <div className="input-with-icon">
                                 <FiUser className="input-icon" />
                                 <input
@@ -92,7 +92,7 @@ const AuthModal = ({ isOpen, onClose, initialMode = 'login' }) => {
                                     value={formData.username}
                                     onChange={handleChange}
                                     className="input-field"
-                                    placeholder="John Doe"
+                                    placeholder="Nguyễn Văn A"
                                     required
                                 />
                             </div>
@@ -100,7 +100,7 @@ const AuthModal = ({ isOpen, onClose, initialMode = 'login' }) => {
                     )}
 
                     <div className="form-group">
-                        <label className="form-label">Email Address</label>
+                        <label className="form-label">Địa chỉ Email</label>
                         <div className="input-with-icon">
                             <FiMail className="input-icon" />
                             <input
@@ -109,14 +109,14 @@ const AuthModal = ({ isOpen, onClose, initialMode = 'login' }) => {
                                 value={formData.email}
                                 onChange={handleChange}
                                 className="input-field"
-                                placeholder="example@gmail.com"
+                                placeholder="vi-du@gmail.com"
                                 required
                             />
                         </div>
                     </div>
 
                     <div className="form-group">
-                        <label className="form-label">Password</label>
+                        <label className="form-label">Mật khẩu</label>
                         <div className="input-with-icon">
                             <FiLock className="input-icon" />
                             <input
@@ -135,7 +135,7 @@ const AuthModal = ({ isOpen, onClose, initialMode = 'login' }) => {
                     {!isLogin && (
                         <>
                             <div className="form-group">
-                                <label className="form-label">Phone Number (Optional)</label>
+                                <label className="form-label">Số điện thoại (Tùy chọn)</label>
                                 <div className="input-with-icon">
                                     <FiPhone className="input-icon" />
                                     <input
@@ -149,7 +149,7 @@ const AuthModal = ({ isOpen, onClose, initialMode = 'login' }) => {
                                 </div>
                             </div>
                             <div className="form-group">
-                                <label className="form-label">Address (Optional)</label>
+                                <label className="form-label">Địa chỉ (Tùy chọn)</label>
                                 <div className="input-with-icon">
                                     <FiMapPin className="input-icon" />
                                     <input
@@ -158,7 +158,7 @@ const AuthModal = ({ isOpen, onClose, initialMode = 'login' }) => {
                                         value={formData.address}
                                         onChange={handleChange}
                                         className="input-field"
-                                        placeholder="123 Main St"
+                                        placeholder="Hà Nội, Việt Nam"
                                     />
                                 </div>
                             </div>
@@ -166,12 +166,12 @@ const AuthModal = ({ isOpen, onClose, initialMode = 'login' }) => {
                     )}
 
                     <button type="submit" className="btn-primary auth-submit" disabled={loading}>
-                        {loading ? 'Processing...' : (isLogin ? 'Sign In' : 'Sign Up')}
+                        {loading ? 'Đang xử lý...' : (isLogin ? 'Đăng nhập' : 'Đăng ký')}
                     </button>
                 </form>
 
                 <div className="divider">
-                    <span>or continue with</span>
+                    <span>hoặc tiếp tục với</span>
                 </div>
 
                 <div className="social-auth">
@@ -181,7 +181,7 @@ const AuthModal = ({ isOpen, onClose, initialMode = 'login' }) => {
                 </div>
 
                 <div className="auth-footer">
-                    {isLogin ? "Don't have an account? " : 'Already have an account? '}
+                    {isLogin ? "Chưa có tài khoản? " : 'Đã có tài khoản? '}
                     <span
                         className="toggle-auth"
                         onClick={() => {
@@ -189,9 +189,10 @@ const AuthModal = ({ isOpen, onClose, initialMode = 'login' }) => {
                             setError('');
                         }}
                     >
-                        {isLogin ? 'Sign Up' : 'Sign In'}
+                        {isLogin ? 'Đăng ký ngay' : 'Đăng nhập'}
                     </span>
                 </div>
+
             </div>
         </div>
     );

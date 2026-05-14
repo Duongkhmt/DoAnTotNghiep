@@ -2,7 +2,7 @@ import axios from 'axios';
 
 const API_URL = '/api';
 
-const api = axios.create({
+export const api = axios.create({
     baseURL: API_URL,
     headers: {
         'Content-Type': 'application/json'
@@ -102,7 +102,7 @@ class MarketService {
     }
 
     getAiLatestPredictions(limit = 20) {
-        return api.get('/ai/predictions/latest', {
+        return api.get('/ai/latest', {
             params: { limit }
         }).then((res) => res.data);
     }
@@ -113,14 +113,6 @@ class MarketService {
         }).then((res) => res.data);
     }
 
-    triggerPrediction() {
-        return api.post('/ai/trigger-prediction').then((res) => res.data);
-    }
-
-    predictNow(symbols) {
-        return api.post('/ai/predict-now', symbols).then((res) => res.data);
-    }
-
     getAiScreeningToday(params = {}) {
         return api.get('/ai/screening/today', {
             params
@@ -128,17 +120,17 @@ class MarketService {
     }
 
     getAiScreeningHistory(days = 30) {
-        return api.get('/ai/screening/history', {
+        return api.get('/ai/history', {
             params: { days }
         }).then((res) => res.data);
     }
 
     getAiMarketOverview() {
-        return api.get('/ai/market/overview').then((res) => res.data);
+        return api.get('/ai/overview').then((res) => res.data);
     }
 
     getAiStockDetail(symbol) {
-        return api.get(`/ai/stock/${symbol}/detail`).then((res) => res.data);
+        return api.get(`/ai/stock/${symbol}`).then((res) => res.data);
     }
 
     getWyckoffAnalysis(symbol) {

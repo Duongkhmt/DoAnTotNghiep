@@ -60,6 +60,20 @@ class UserService {
     getMyInfo() {
         return api.get('/users/my-info').then((res) => res.data);
     }
+
+    updateMyInfo(data) {
+        return api.put('/users/my-info', data).then((res) => res.data);
+    }
+
+    uploadAvatar(file) {
+        const formData = new FormData();
+        formData.append('file', file);
+        return api.post('/users/avatar', formData, {
+            headers: {
+                'Content-Type': 'multipart/form-data'
+            }
+        }).then((res) => res.data);
+    }
 }
 
 export default new UserService();

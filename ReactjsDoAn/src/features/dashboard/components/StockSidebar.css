@@ -1,8 +1,8 @@
 .stock-sidebar {
     width: 140px;
-    background: rgba(255, 255, 255, 0.8);
-    backdrop-filter: blur(10px);
-    border-right: 1px solid #e2e8f0;
+    background: var(--nav-bg);
+    backdrop-filter: var(--glass-blur);
+    border-right: 1px solid var(--card-border);
     display: flex;
     flex-direction: column;
     padding: 1rem 0;
@@ -10,6 +10,7 @@
     position: relative;
     height: 100%;
 }
+
 
 .stock-sidebar.collapsed {
     width: 80px;
@@ -22,17 +23,18 @@
     transform: translateY(-50%);
     width: 28px;
     height: 28px;
-    background: #ffffff;
-    border: 1px solid #e2e8f0;
+    background: var(--bg-primary);
+    border: 1px solid var(--card-border);
     border-radius: 50%;
-    color: var(--text-color);
+    color: var(--text-primary);
     display: flex;
     align-items: center;
     justify-content: center;
     cursor: pointer;
     z-index: 10;
-    transition: background 0.2s;
+    transition: all 0.2s;
 }
+
 
 .sidebar-toggle-btn:hover {
     background: #3b82f6;
@@ -81,19 +83,16 @@
 
 .sidebar-search input {
     width: 100%;
-    background: #ffffff;
-    border: 1px solid #cbd5e1;
+    background: var(--input-bg);
+    border: 1px solid var(--card-border);
     border-radius: 6px;
     padding: 0.5rem 0.2rem 0.5rem 1.6rem;
-    /* Nhích padding trái vào một chút */
-    /* Giảm padding trái phải một chút */
-    color: var(--text-color);
+    color: var(--text-primary);
     font-size: 0.75rem;
-    /* Chữ ô tìm kiếm nhỏ hơn xíu nữa */
-    /* Chữ ô tìm kiếm nhỏ lại */
     outline: none;
     transition: border-color 0.2s;
 }
+
 
 .sidebar-search input:focus {
     border-color: #3b82f6;
@@ -119,8 +118,8 @@
 
 .symbol-btn {
     background: transparent;
-    border: 1px solid #e2e8f0;
-    color: var(--text-color);
+    border: 1px solid var(--card-border);
+    color: var(--text-secondary);
     padding: 0.65rem 0.4rem;
     border-radius: 6px;
     font-size: 0.85rem;
@@ -128,28 +127,21 @@
     cursor: pointer;
     transition: all 0.2s;
     text-align: center;
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    flex-shrink: 0; /* Prevent squashing */
-    min-height: 36px;
-}
-
-.stock-sidebar.collapsed .symbol-btn {
-    padding: 0.75rem 0.25rem;
 }
 
 .symbol-btn:hover {
-    background: rgba(0, 0, 0, 0.05);
-    border-color: #cbd5e1;
+    background: var(--card-bg);
+    border-color: var(--primary);
+    color: var(--text-primary);
 }
 
 .symbol-btn.active {
-    background: var(--primary-color);
-    border-color: var(--primary-hover);
+    background: var(--primary);
+    border-color: var(--primary);
     color: white;
-    box-shadow: 0 4px 12px rgba(99, 102, 241, 0.4);
+    box-shadow: 0 4px 12px var(--primary-glow);
 }
+
 
 .collapsed .symbol-info .symbol-price,
 .collapsed .symbol-change,
