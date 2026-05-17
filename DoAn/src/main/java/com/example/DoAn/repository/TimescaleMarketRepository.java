@@ -8,6 +8,8 @@ import com.example.DoAn.dto.response.StockHistoryDTO;
 import com.example.DoAn.dto.response.StockResponseDTO;
 import com.example.DoAn.dto.response.ValuationDTO;
 import com.example.DoAn.dto.response.WyckoffAnalysisDTO;
+
+import org.springframework.jdbc.core.RowMapper;
 import org.springframework.jdbc.core.namedparam.MapSqlParameterSource;
 import org.springframework.jdbc.core.namedparam.NamedParameterJdbcTemplate;
 import org.springframework.stereotype.Repository;
@@ -20,53 +22,12 @@ import java.sql.SQLException;
 import java.sql.Timestamp;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
-import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
 
-/**
- * Optimized repository for Timescale market data.
- *
- * Key optimizations applied:
- * 1. Replaced correlated subqueries with LATERAL joins for latest-row lookups.
- * 2. Removed UPPER(TRIM(...)) from JOIN conditions — normalize symbols at the
- *    application layer instead, so composite indexes can be used.
- * 3. Merged the three separate findValuation queries into one CTE.
- * 4. Added recommended DDL comments for indexes that should exist on the DB side.
- *
- * Required indexes (run once on the database):
- * -----------------------------------------------
- * CREATE INDEX CONCURRENTLY idx_quote_history_symbol_date
- *     ON quote_history(symbol, trading_date DESC);
- *
- * CREATE INDEX CONCURRENTLY idx_dos_symbol_date
- *     ON dashboard_order_stats(symbol, trading_date);
- *
- * CREATE INDEX CONCURRENTLY idx_trading_symbol_date
- *     ON trading(symbol, trading_date);
- *
- * CREATE INDEX CONCURRENTLY idx_dv_symbol_date
- *     ON dashboard_valuation(symbol, trading_date DESC);
- *
- * CREATE INDEX CONCURRENTLY idx_listing_symbol ON listing(symbol);
- * CREATE INDEX CONCURRENTLY idx_company_symbol  ON company(symbol);
- * CREATE INDEX CONCURRENTLY idx_wyckoff_symbol  ON wyckoff_analysis(symbol);
- *
- * Optional Materialized View for findAllStocks (refresh after each session):
- * --------------------------------------------------------------------------
- * CREATE MATERIALIZED VIEW mv_latest_quote AS
- *   SELECT DISTINCT ON (symbol) symbol, volume, close, trading_date
- *   FROM quote_history
- *   ORDER BY symbol, trading_date DESC;
- * CREATE UNIQUE INDEX ON mv_latest_quote(symbol);
- * -- Refresh: REFRESH MATERIALIZED VIEW CONCURRENTLY mv_latest_quote;
- */
 @Repository
 public class TimescaleMarketRepository {
 
-    // ---------------------------------------------------------------------------
-    // Base fragment reused by findAllStocks / searchStocks / findStockBySymbol
-    // ---------------------------------------------------------------------------
     private static final String STOCK_BASE_SQL = """
             SELECT
                 l.symbol,
@@ -76,346 +37,191 @@ public class TimescaleMarketRepository {
             LEFT JOIN company c ON c.symbol = l.symbol
             """;
 
+    private static final String FIND_ALL_STOCKS_SQL = STOCK_BASE_SQL + """
+            LEFT JOIN LATERAL (
+                SELECT volume
+                FROM quote_history
+                WHERE symbol = l.symbol
+                ORDER BY trading_date DESC
+                LIMIT 1
+            ) q ON true
+            ORDER BY q.volume DESC NULLS LAST, l.symbol ASC
+            """;
+
+    private static final String SEARCH_STOCKS_SQL = STOCK_BASE_SQL + """
+            LEFT JOIN LATERAL (
+                SELECT volume
+                FROM quote_history
+                WHERE symbol = l.symbol
+                ORDER BY trading_date DESC
+                LIMIT 1
+            ) q ON true
+            WHERE LOWER(l.symbol) LIKE LOWER(:keyword)
+               OR LOWER(COALESCE(c.name, l.organ_name, '')) LIKE LOWER(:keyword)
+            ORDER BY q.volume DESC NULLS LAST, l.symbol ASC
+            """;
+
+    private static final String FIND_STOCK_HISTORY_BASE_SQL = """
+            WITH q AS MATERIALIZED (
+                SELECT *
+                FROM quote_history
+                WHERE symbol = :symbol
+                  AND trading_date BETWEEN :startDate AND :endDate
+            )
+            SELECT
+                q.symbol, q.trading_date, q.open, q.high, q.low, q.close, q.volume, q.turnover,
+                dos.buy_volume AS buy_value, dos.sell_volume AS sell_value,
+                dos.avg_buy_order, dos.avg_sell_order, dos.ratio_sell_buy_order,
+                dos.matched_buy_volume AS matched_buy_value, dos.matched_sell_volume AS matched_sell_value,
+                dos.cancel_buy_volume AS cancel_buy_value, dos.cancel_sell_volume AS cancel_sell_value,
+                dos.foreign_buy_volume, dos.foreign_sell_volume,
+                t.fr_buy_value, t.fr_sell_value, t.prop_buy_value, t.prop_sell_value,
+                dv.pe AS pe_val, dv.pb AS pb_val
+            FROM q
+            LEFT JOIN dashboard_order_stats dos ON dos.symbol = q.symbol AND dos.trading_date = q.trading_date
+            LEFT JOIN trading t ON t.symbol = q.symbol AND t.trading_date = q.trading_date
+            LEFT JOIN dashboard_valuation dv ON dv.symbol = q.symbol AND dv.trading_date = q.trading_date
+            """;
+
+    private static final String FIND_VALUATION_BASIC_SQL = """
+            WITH latest AS (
+                SELECT symbol, trading_date, close_price, pe, pb
+                FROM dashboard_valuation
+                WHERE symbol = :symbol
+                  AND trading_date <= :date
+                ORDER BY trading_date DESC
+                LIMIT 1
+            ),
+            stats AS (
+                SELECT
+                    MIN(pe) AS pe_min, MAX(pe) AS pe_max, AVG(pe) AS pe_avg,
+                    MIN(pb) AS pb_min, MAX(pb) AS pb_max, AVG(pb) AS pb_avg
+                FROM dashboard_valuation
+                WHERE symbol = :symbol
+            )
+            SELECT
+                l.symbol, l.trading_date, l.close_price, l.pe, l.pb,
+                s.pe_min, s.pe_max, s.pe_avg, s.pb_min, s.pb_max, s.pb_avg
+            FROM latest l
+            CROSS JOIN stats s
+            """;
+
+    private static final String FIND_PEERS_SQL = """
+            WITH target_industry AS (
+                SELECT COALESCE(c.industry, l.industry) AS industry
+                FROM listing l
+                LEFT JOIN company c ON c.symbol = l.symbol
+                WHERE l.symbol = :symbol
+            )
+            SELECT dv.symbol, dv.pe, dv.pb, dv.close_price
+            FROM dashboard_valuation dv
+            JOIN listing l ON l.symbol = dv.symbol
+            LEFT JOIN company c ON c.symbol = dv.symbol
+            CROSS JOIN target_industry ti
+            WHERE COALESCE(c.industry, l.industry) = ti.industry
+              AND dv.trading_date = :tradeDate
+              AND dv.symbol <> :symbol
+            ORDER BY dv.symbol ASC
+            LIMIT 10
+            """;
+
+    private static final String FIND_FOREIGN_TRADING_SQL = """
+            SELECT
+                q.symbol, q.trading_date,
+                t.fr_buy_value, t.fr_sell_value, t.prop_buy_value, t.prop_sell_value
+            FROM quote_history q
+            LEFT JOIN trading t ON t.symbol = q.symbol AND t.trading_date = q.trading_date
+            WHERE q.symbol = :symbol
+              AND q.trading_date BETWEEN :startDate AND :endDate
+            ORDER BY q.trading_date DESC
+            """;
+
+    private static final String FIND_INDUSTRY_FLOW_SNAPSHOT_SQL = """
+            SELECT * FROM dashboard_industry_flow
+            WHERE trading_date = (
+                SELECT MAX(trading_date) FROM dashboard_industry_flow WHERE trading_date <= :date
+            )
+            """;
+
+    private static final String PREDICTION_BASE_SQL = """
+            SELECT
+                p.symbol, p.predict_date, p.target_date, p.predicted_close,
+                q.close AS actual_close, p.trend, p.model_used, p.created_at
+            FROM ml_predictions p
+            LEFT JOIN quote_history q ON q.symbol = p.symbol AND q.trading_date = p.target_date
+            """;
+
     private final NamedParameterJdbcTemplate jdbcTemplate;
 
     public TimescaleMarketRepository(NamedParameterJdbcTemplate jdbcTemplate) {
         this.jdbcTemplate = jdbcTemplate;
     }
 
-    // ---------------------------------------------------------------------------
-    // Stock listing
-    // ---------------------------------------------------------------------------
-
-    /**
-     * Returns all stocks ordered by most-recent volume descending.
-     *
-     * Uses LATERAL instead of a correlated subquery so the planner can
-     * push the index seek per row rather than doing a full DISTINCT ON scan.
-     */
     public List<StockResponseDTO> findAllStocks() {
-        String sql = STOCK_BASE_SQL + """
-                LEFT JOIN LATERAL (
-                    SELECT volume
-                    FROM quote_history
-                    WHERE symbol = l.symbol
-                    ORDER BY trading_date DESC
-                    LIMIT 1
-                ) q ON true
-                ORDER BY q.volume DESC NULLS LAST, l.symbol ASC
-                """;
-        return jdbcTemplate.query(sql, new MapSqlParameterSource(),
-                (rs, rowNum) -> mapStock(rs));
+        return jdbcTemplate.query(FIND_ALL_STOCKS_SQL, new MapSqlParameterSource(), new StockRowMapper());
     }
 
-    /**
-     * Full-text symbol / name search with volume ordering.
-     */
     public List<StockResponseDTO> searchStocks(String keyword) {
-        String sql = STOCK_BASE_SQL + """
-                LEFT JOIN LATERAL (
-                    SELECT volume
-                    FROM quote_history
-                    WHERE symbol = l.symbol
-                    ORDER BY trading_date DESC
-                    LIMIT 1
-                ) q ON true
-                WHERE LOWER(l.symbol) LIKE LOWER(:keyword)
-                   OR LOWER(COALESCE(c.name, l.organ_name, '')) LIKE LOWER(:keyword)
-                ORDER BY q.volume DESC NULLS LAST, l.symbol ASC
-                """;
-        return jdbcTemplate.query(sql,
+        return jdbcTemplate.query(SEARCH_STOCKS_SQL,
                 new MapSqlParameterSource("keyword", "%" + keyword + "%"),
-                (rs, rowNum) -> mapStock(rs));
+                new StockRowMapper());
     }
 
     public Optional<StockResponseDTO> findStockBySymbol(String symbol) {
-        List<StockResponseDTO> results = jdbcTemplate.query(
-                STOCK_BASE_SQL + " WHERE l.symbol = :symbol",
+        String sql = STOCK_BASE_SQL + " WHERE l.symbol = :symbol";
+        List<StockResponseDTO> results = jdbcTemplate.query(sql,
                 new MapSqlParameterSource("symbol", normalize(symbol)),
-                (rs, rowNum) -> mapStock(rs));
+                new StockRowMapper());
         return results.stream().findFirst();
     }
 
-    // ---------------------------------------------------------------------------
-    // Stock history
-    // ---------------------------------------------------------------------------
-
-    /**
-     * Returns OHLCV + order-stats + foreign trading + valuation for a date range.
-     *
-     * Symbols are normalized before binding so that JOIN conditions can use
-     * plain equality and therefore benefit from composite indexes.
-     */
-    public List<StockHistoryDTO> findStockHistory(
-            String symbol, LocalDate startDate, LocalDate endDate, boolean descending) {
-
-        String normalizedSymbol = normalize(symbol);
-
-        String sql = """
-                WITH q AS MATERIALIZED (
-                    SELECT *
-                    FROM quote_history
-                    WHERE symbol = :symbol
-                      AND trading_date BETWEEN :startDate AND :endDate
-                )
-                SELECT
-                    q.symbol,
-                    q.trading_date,
-                    q.open,
-                    q.high,
-                    q.low,
-                    q.close,
-                    q.volume,
-                    q.turnover,
-                    dos.buy_volume           AS buy_value,
-                    dos.sell_volume          AS sell_value,
-                    dos.avg_buy_order,
-                    dos.avg_sell_order,
-                    dos.ratio_sell_buy_order,
-                    dos.matched_buy_volume   AS matched_buy_value,
-                    dos.matched_sell_volume  AS matched_sell_value,
-                    dos.cancel_buy_volume    AS cancel_buy_value,
-                    dos.cancel_sell_volume   AS cancel_sell_value,
-                    dos.foreign_buy_volume,
-                    dos.foreign_sell_volume,
-                    t.fr_buy_value,
-                    t.fr_sell_value,
-                    t.prop_buy_value,
-                    t.prop_sell_value,
-                    dv.pe AS pe_val,
-                    dv.pb AS pb_val
-                FROM q
-                LEFT JOIN dashboard_order_stats dos
-                    ON dos.symbol       = q.symbol
-                   AND dos.trading_date = q.trading_date
-                LEFT JOIN trading t
-                    ON t.symbol       = q.symbol
-                   AND t.trading_date = q.trading_date
-                LEFT JOIN dashboard_valuation dv
-                    ON dv.symbol       = q.symbol
-                   AND dv.trading_date = q.trading_date
-                ORDER BY q.trading_date
-                """ + (descending ? "DESC" : "ASC");
-
+    public List<StockHistoryDTO> findStockHistory(String symbol, LocalDate startDate, LocalDate endDate, boolean descending) {
+        String sql = FIND_STOCK_HISTORY_BASE_SQL + " ORDER BY q.trading_date " + (descending ? "DESC" : "ASC");
         MapSqlParameterSource params = new MapSqlParameterSource()
-                .addValue("symbol", normalizedSymbol)
+                .addValue("symbol", normalize(symbol))
                 .addValue("startDate", startDate)
                 .addValue("endDate", endDate);
 
-        return jdbcTemplate.query(sql, params, (rs, rowNum) -> mapStockHistory(rs));
+        return jdbcTemplate.query(sql, params, new StockHistoryRowMapper());
     }
 
-    // ---------------------------------------------------------------------------
-    // Valuation
-    // ---------------------------------------------------------------------------
-
-    /**
-     * Returns current valuation + historical stats + peer comparison.
-     *
-     * Merged three separate round-trips into a single CTE query so the DB
-     * only needs one parse / plan cycle for the most expensive part.
-     * The peer query remains separate because it depends on the resolved
-     * trading_date from the first result.
-     */
-    public Optional<ValuationDTO> findValuation(String symbol, LocalDate date) {
-
-        String normalizedSymbol = normalize(symbol);
-
-        // Single query: latest row + historical min/max/avg via CTE
-        String sql = """
-                WITH latest AS (
-                    SELECT symbol, trading_date, close_price, pe, pb
-                    FROM dashboard_valuation
-                    WHERE symbol = :symbol
-                      AND trading_date <= :date
-                    ORDER BY trading_date DESC
-                    LIMIT 1
-                ),
-                stats AS (
-                    SELECT
-                        MIN(pe) AS pe_min,
-                        MAX(pe) AS pe_max,
-                        AVG(pe) AS pe_avg,
-                        MIN(pb) AS pb_min,
-                        MAX(pb) AS pb_max,
-                        AVG(pb) AS pb_avg
-                    FROM dashboard_valuation
-                    WHERE symbol = :symbol
-                )
-                SELECT
-                    l.symbol,
-                    l.trading_date,
-                    l.close_price,
-                    l.pe,
-                    l.pb,
-                    s.pe_min,
-                    s.pe_max,
-                    s.pe_avg,
-                    s.pb_min,
-                    s.pb_max,
-                    s.pb_avg
-                FROM latest l
-                CROSS JOIN stats s
-                """;
-
-        List<ValuationDTO> rows = jdbcTemplate.query(
-                sql,
+    public Optional<ValuationDTO> findValuationBasic(String symbol, LocalDate date) {
+        List<ValuationDTO> rows = jdbcTemplate.query(FIND_VALUATION_BASIC_SQL,
                 new MapSqlParameterSource()
-                        .addValue("symbol", normalizedSymbol)
+                        .addValue("symbol", normalize(symbol))
                         .addValue("date", date),
-                (rs, rowNum) -> ValuationDTO.builder()
-                        .symbol(rs.getString("symbol"))
-                        .tradeDate(toLocalDate(rs, "trading_date"))
-                        .price(defaultZero(getBigDecimal(rs, "close_price")))
-                        .pe(defaultZero(getBigDecimal(rs, "pe")))
-                        .pb(defaultZero(getBigDecimal(rs, "pb")))
-                        .peMin(defaultZero(getBigDecimal(rs, "pe_min")))
-                        .peMax(defaultZero(getBigDecimal(rs, "pe_max")))
-                        .peAvg(defaultZero(scale(getBigDecimal(rs, "pe_avg"))))
-                        .pbMin(defaultZero(getBigDecimal(rs, "pb_min")))
-                        .pbMax(defaultZero(getBigDecimal(rs, "pb_max")))
-                        .pbAvg(defaultZero(scale(getBigDecimal(rs, "pb_avg"))))
-                        .build());
+                new ValuationRowMapper());
 
-        if (rows.isEmpty()) {
-            return Optional.empty();
-        }
-
-        ValuationDTO current = rows.getFirst();
-        List<PeerComparisonDTO> peers = findPeers(normalizedSymbol, current.getTradeDate());
-
-        return Optional.of(current.toBuilder().peers(peers).build());
+        return rows.stream().findFirst();
     }
 
-    /**
-     * Finds up to 10 peers in the same industry for the given trade date.
-     */
-    private List<PeerComparisonDTO> findPeers(String normalizedSymbol, LocalDate tradeDate) {
-        return jdbcTemplate.query(
-                """
-                        WITH target_industry AS (
-                            SELECT COALESCE(c.industry, l.industry) AS industry
-                            FROM listing l
-                            LEFT JOIN company c ON c.symbol = l.symbol
-                            WHERE l.symbol = :symbol
-                        )
-                        SELECT
-                            dv.symbol,
-                            dv.pe,
-                            dv.pb,
-                            dv.close_price
-                        FROM dashboard_valuation dv
-                        JOIN listing l ON l.symbol = dv.symbol
-                        LEFT JOIN company c ON c.symbol = dv.symbol
-                        CROSS JOIN target_industry ti
-                        WHERE COALESCE(c.industry, l.industry) = ti.industry
-                          AND dv.trading_date = :tradeDate
-                          AND dv.symbol <> :symbol
-                        ORDER BY dv.symbol ASC
-                        LIMIT 10
-                        """,
+    public List<PeerComparisonDTO> findPeers(String symbol, LocalDate tradeDate) {
+        return jdbcTemplate.query(FIND_PEERS_SQL,
                 new MapSqlParameterSource()
-                        .addValue("symbol", normalizedSymbol)
+                        .addValue("symbol", normalize(symbol))
                         .addValue("tradeDate", tradeDate),
-                (rs, rowNum) -> PeerComparisonDTO.builder()
-                        .symbol(rs.getString("symbol"))
-                        .pe(defaultZero(getBigDecimal(rs, "pe")))
-                        .pb(defaultZero(getBigDecimal(rs, "pb")))
-                        .price(defaultZero(getBigDecimal(rs, "close_price")))
-                        .build());
+                new PeerComparisonRowMapper());
     }
 
-    // ---------------------------------------------------------------------------
-    // Foreign trading
-    // ---------------------------------------------------------------------------
-
-    public List<ForeignTradingDTO> findForeignTrading(
-            String symbol, LocalDate startDate, LocalDate endDate) {
-
-        return jdbcTemplate.query(
-                """
-                        SELECT
-                            q.symbol,
-                            q.trading_date,
-                            t.fr_buy_value,
-                            t.fr_sell_value,
-                            t.prop_buy_value,
-                            t.prop_sell_value
-                        FROM quote_history q
-                        LEFT JOIN trading t
-                            ON t.symbol       = q.symbol
-                           AND t.trading_date = q.trading_date
-                        WHERE q.symbol = :symbol
-                          AND q.trading_date BETWEEN :startDate AND :endDate
-                        ORDER BY q.trading_date DESC
-                        """,
+    public List<ForeignTradingDTO> findForeignTrading(String symbol, LocalDate startDate, LocalDate endDate) {
+        return jdbcTemplate.query(FIND_FOREIGN_TRADING_SQL,
                 new MapSqlParameterSource()
                         .addValue("symbol", normalize(symbol))
                         .addValue("startDate", startDate)
                         .addValue("endDate", endDate),
-                (rs, rowNum) -> {
-                    BigDecimal foreignBuy = defaultZero(getBigDecimal(rs, "fr_buy_value"));
-                    BigDecimal foreignSell = defaultZero(getBigDecimal(rs, "fr_sell_value"));
-                    BigDecimal propBuy = defaultZero(getBigDecimal(rs, "prop_buy_value"));
-                    BigDecimal propSell = defaultZero(getBigDecimal(rs, "prop_sell_value"));
-
-                    return ForeignTradingDTO.builder()
-                            .symbol(rs.getString("symbol"))
-                            .tradeDate(toLocalDate(rs, "trading_date"))
-                            .foreignBuy(foreignBuy)
-                            .foreignSell(foreignSell)
-                            .foreignNet(foreignBuy.subtract(foreignSell))
-                            .tdMua(propBuy)
-                            .tdBan(propSell)
-                            .tdRong(propBuy.subtract(propSell))
-                            .cnMua(null)
-                            .cnBan(null)
-                            .cnRong(null)
-                            .tcMua(null)
-                            .tcBan(null)
-                            .tcRong(null)
-                            .foreignBuyTong(foreignBuy)
-                            .foreignSellTong(foreignSell)
-                            .foreignNetTong(foreignBuy.subtract(foreignSell))
-                            .tdMuaTong(propBuy)
-                            .tdBanTong(propSell)
-                            .tdRongTong(propBuy.subtract(propSell))
-                            .cnMuaTong(null)
-                            .cnBanTong(null)
-                            .cnRongTong(null)
-                            .tcMuaTong(null)
-                            .tcBanTong(null)
-                            .tcRongTong(null)
-                            .build();
-                });
+                new ForeignTradingRowMapper());
     }
 
-    // ---------------------------------------------------------------------------
-    // Industry flow
-    // ---------------------------------------------------------------------------
-
     public List<IndustryFlowDTO> findIndustryFlow(LocalDate date) {
-        String sql = """
-                SELECT *
-                FROM dashboard_industry_flow
-                WHERE trading_date = (
-                    SELECT MAX(trading_date)
-                    FROM dashboard_industry_flow
-                    WHERE trading_date <= :date
-                )
-                LIMIT 1
-                """;
-
-        return jdbcTemplate.query(
-                sql,
+        return jdbcTemplate.query(FIND_INDUSTRY_FLOW_SNAPSHOT_SQL,
                 new MapSqlParameterSource("date", date),
-                (rs, rowNum) -> mapIndustryFlowSnapshot(rs));
+                new IndustryFlowRowMapper());
     }
 
     public List<IndustryFlowDTO> findIndustryFlowHistory(LocalDate date, int limit, int offset) {
-        MapSqlParameterSource params = new MapSqlParameterSource();
-        params.addValue("limit", limit);
-        params.addValue("offset", offset);
+        MapSqlParameterSource params = new MapSqlParameterSource()
+                .addValue("limit", limit)
+                .addValue("offset", offset);
 
         StringBuilder sql = new StringBuilder("SELECT * FROM dashboard_industry_flow ");
         if (date != null) {
@@ -424,223 +230,206 @@ public class TimescaleMarketRepository {
         }
         sql.append("ORDER BY trading_date DESC LIMIT :limit OFFSET :offset");
 
-        return jdbcTemplate.query(
-                sql.toString(),
-                params,
-                (rs, rowNum) -> mapIndustryFlowSnapshot(rs));
+        return jdbcTemplate.query(sql.toString(), params, new IndustryFlowRowMapper());
     }
 
-    // ---------------------------------------------------------------------------
-    // ML Predictions
-    // ---------------------------------------------------------------------------
-
     public List<PredictionResponse> findLatestPredictions(int limit) {
-        return jdbcTemplate.query(
-                """
-                        SELECT
-                            p.symbol,
-                            p.predict_date,
-                            p.target_date,
-                            p.predicted_close,
-                            q.close AS actual_close,
-                            p.trend,
-                            p.model_used,
-                            p.created_at
-                        FROM ml_predictions p
-                        LEFT JOIN quote_history q
-                               ON q.symbol       = p.symbol
-                              AND q.trading_date  = p.target_date
-                        ORDER BY p.created_at DESC
-                        LIMIT :limit
-                        """,
-                new MapSqlParameterSource("limit", limit),
-                (rs, rowNum) -> mapPrediction(rs));
+        String sql = PREDICTION_BASE_SQL + " ORDER BY p.created_at DESC LIMIT :limit";
+        return jdbcTemplate.query(sql, new MapSqlParameterSource("limit", limit), new PredictionRowMapper());
     }
 
     public List<PredictionResponse> findPredictionsBySymbol(String symbol, int limit) {
-        return jdbcTemplate.query(
-                """
-                        SELECT
-                            p.symbol,
-                            p.predict_date,
-                            p.target_date,
-                            p.predicted_close,
-                            q.close AS actual_close,
-                            p.trend,
-                            p.model_used,
-                            p.created_at
-                        FROM ml_predictions p
-                        LEFT JOIN quote_history q
-                               ON q.symbol      = p.symbol
-                              AND q.trading_date = p.target_date
-                        WHERE p.symbol = :symbol
-                        ORDER BY p.created_at DESC
-                        LIMIT :limit
-                        """,
+        String sql = PREDICTION_BASE_SQL + " WHERE p.symbol = :symbol ORDER BY p.created_at DESC LIMIT :limit";
+        return jdbcTemplate.query(sql,
                 new MapSqlParameterSource()
                         .addValue("symbol", normalize(symbol))
                         .addValue("limit", limit),
-                (rs, rowNum) -> mapPrediction(rs));
+                new PredictionRowMapper());
     }
 
-    // ---------------------------------------------------------------------------
-    // Wyckoff
-    // ---------------------------------------------------------------------------
-
     public Optional<WyckoffAnalysisDTO> findWyckoffAnalysis(String symbol) {
-        List<WyckoffAnalysisDTO> results = jdbcTemplate.query(
-                "SELECT * FROM wyckoff_analysis WHERE symbol = :symbol",
+        String sql = "SELECT * FROM wyckoff_analysis WHERE symbol = :symbol";
+        List<WyckoffAnalysisDTO> results = jdbcTemplate.query(sql,
                 new MapSqlParameterSource("symbol", normalize(symbol)),
-                (rs, rowNum) -> WyckoffAnalysisDTO.builder()
-                        .symbol(rs.getString("symbol"))
-                        .phase(rs.getString("phase"))
-                        .schematic(rs.getString("schematic"))
-                        .trLow(getBigDecimal(rs, "tr_low"))
-                        .trHigh(getBigDecimal(rs, "tr_high"))
-                        .lastClose(getBigDecimal(rs, "last_close"))
-                        .lastDate(toLocalDate(rs, "last_date"))
-                        .riskReward(getBigDecimal(rs, "risk_reward"))
-                        .dataJson(rs.getString("data_json"))
-                        .build());
+                new WyckoffRowMapper());
         return results.stream().findFirst();
     }
 
-    // ---------------------------------------------------------------------------
-    // Private helpers — industry flow
-    // ---------------------------------------------------------------------------
-
-    private IndustryFlowDTO mapIndustryFlowSnapshot(ResultSet rs) throws SQLException {
-        LocalDate tradeDate = toLocalDate(rs, "trading_date");
-        BigDecimal bankTotal = defaultZero(getBigDecimal(rs, "bank_total"));
-        BigDecimal bankBuy   = defaultZero(getBigDecimal(rs, "bank_buy"));
-        BigDecimal bankSell  = defaultZero(getBigDecimal(rs, "bank_sell"));
-
-        BigDecimal secTotal  = defaultZero(getBigDecimal(rs, "sec_total"));
-        BigDecimal secBuy    = defaultZero(getBigDecimal(rs, "sec_buy"));
-        BigDecimal secSell   = defaultZero(getBigDecimal(rs, "sec_sell"));
-
-        BigDecimal reTotal   = defaultZero(getBigDecimal(rs, "re_total"));
-        BigDecimal reBuy     = defaultZero(getBigDecimal(rs, "re_buy"));
-        BigDecimal reSell    = defaultZero(getBigDecimal(rs, "re_sell"));
-
-        BigDecimal steelTotal = defaultZero(getBigDecimal(rs, "steel_total"));
-        BigDecimal steelBuy   = defaultZero(getBigDecimal(rs, "steel_buy"));
-        BigDecimal steelSell  = defaultZero(getBigDecimal(rs, "steel_sell"));
-
-        BigDecimal vinTotal = defaultZero(getBigDecimal(rs, "vin_total"));
-        BigDecimal vinBuy   = defaultZero(getBigDecimal(rs, "vin_buy"));
-        BigDecimal vinSell  = defaultZero(getBigDecimal(rs, "vin_sell"));
-
-        return IndustryFlowDTO.builder()
-                .tradeDate(tradeDate)
-                .totalValue(defaultZero(getBigDecimal(rs, "market_total_val")))
-                .totalNH(bankTotal)
-                .muaNH(bankBuy)
-                .banNH(bankSell)
-                .tiLeNH(defaultZero(getBigDecimal(rs, "bank_ratio_pct")))
-                .totalCK(secTotal)
-                .muaCK(secBuy)
-                .banCK(secSell)
-                .tiLeCK(defaultZero(getBigDecimal(rs, "sec_ratio_pct")))
-                .totalBDS(reTotal)
-                .muaBDS(reBuy)
-                .banBDS(reSell)
-                .tiLeBDS(defaultZero(getBigDecimal(rs, "re_ratio_pct")))
-                .totalThep(steelTotal)
-                .muaThep(steelBuy)
-                .banThep(steelSell)
-                .tiLeThep(defaultZero(getBigDecimal(rs, "steel_ratio_pct")))
-                .totalVIN(vinTotal)
-                .muaVIN(vinBuy)
-                .banVIN(vinSell)
-                .tiLeVIN(defaultZero(getBigDecimal(rs, "vin_ratio_pct")))
-                .build();
+    private static class StockRowMapper implements RowMapper<StockResponseDTO> {
+        @Override
+        public StockResponseDTO mapRow(ResultSet rs, int rowNum) throws SQLException {
+            return StockResponseDTO.builder()
+                    .symbol(rs.getString("symbol"))
+                    .companyName(rs.getString("company_name"))
+                    .exchange(rs.getString("exchange"))
+                    .build();
+        }
     }
 
+    private static class StockHistoryRowMapper implements RowMapper<StockHistoryDTO> {
+        @Override
+        public StockHistoryDTO mapRow(ResultSet rs, int rowNum) throws SQLException {
+            BigDecimal foreignBuyVol  = rs.getBigDecimal("foreign_buy_volume");
+            BigDecimal foreignSellVol = rs.getBigDecimal("foreign_sell_volume");
+            BigDecimal activeBuyValue  = rs.getBigDecimal("matched_buy_value");
+            BigDecimal activeSellValue = rs.getBigDecimal("matched_sell_value");
+            BigDecimal propBuy        = rs.getBigDecimal("prop_buy_value");
+            BigDecimal propSell       = rs.getBigDecimal("prop_sell_value");
+            BigDecimal close = rs.getBigDecimal("close");
 
-    // ---------------------------------------------------------------------------
-    // Private helpers — row mappers
-    // ---------------------------------------------------------------------------
-
-    private StockResponseDTO mapStock(ResultSet rs) throws SQLException {
-        return StockResponseDTO.builder()
-                .symbol(rs.getString("symbol"))
-                .companyName(rs.getString("company_name"))
-                .exchange(rs.getString("exchange"))
-                .build();
+            return StockHistoryDTO.builder()
+                    .symbol(rs.getString("symbol"))
+                    .tradeDate(toLocalDate(rs, "trading_date"))
+                    .openPrice(rs.getBigDecimal("open"))
+                    .highPrice(rs.getBigDecimal("high"))
+                    .lowPrice(rs.getBigDecimal("low"))
+                    .closePrice(close)
+                    .volume(rs.getBigDecimal("volume"))
+                    .turnover(rs.getBigDecimal("turnover"))
+                    .totalValue(rs.getBigDecimal("volume"))
+                    .buyOrderValue(rs.getBigDecimal("buy_value"))
+                    .sellOrderValue(rs.getBigDecimal("sell_value"))
+                    .avgBuyOrderVolume(rs.getBigDecimal("avg_buy_order"))
+                    .avgSellOrderVolume(rs.getBigDecimal("avg_sell_order"))
+                    .orderRatio(getDouble(rs, "ratio_sell_buy_order"))
+                    .activeBuyValue(activeBuyValue)
+                    .activeSellValue(activeSellValue)
+                    .matchedRatio(calculateRatio(activeSellValue, activeBuyValue))
+                    .cancelBuyValue(rs.getBigDecimal("cancel_buy_value"))
+                    .cancelSellValue(rs.getBigDecimal("cancel_sell_value"))
+                    .foreignBuyVol(foreignBuyVol)
+                    .foreignSellVol(foreignSellVol)
+                    .foreignNetVol(calculateNet(foreignBuyVol, foreignSellVol))
+                    .propBuyVal(propBuy)
+                    .propSellVal(propSell)
+                    .propNetVal(calculateNet(propBuy, propSell))
+                    .pe(rs.getBigDecimal("pe_val"))
+                    .pb(rs.getBigDecimal("pb_val"))
+                    .build();
+        }
     }
 
-    private PredictionResponse mapPrediction(ResultSet rs) throws SQLException {
-        return PredictionResponse.builder()
-                .symbol(rs.getString("symbol"))
-                .predictDate(toLocalDate(rs, "predict_date"))
-                .targetDate(toLocalDate(rs, "target_date"))
-                .predictedClose(getBigDecimal(rs, "predicted_close"))
-                .actualClose(getBigDecimal(rs, "actual_close"))
-                .trend(rs.getString("trend"))
-                .modelUsed(rs.getString("model_used"))
-                .createdAt(toLocalDateTime(rs, "created_at"))
-                .build();
+    private static class ValuationRowMapper implements RowMapper<ValuationDTO> {
+        @Override
+        public ValuationDTO mapRow(ResultSet rs, int rowNum) throws SQLException {
+            return ValuationDTO.builder()
+                    .symbol(rs.getString("symbol"))
+                    .tradeDate(toLocalDate(rs, "trading_date"))
+                    .price(defaultZero(rs.getBigDecimal("close_price")))
+                    .pe(defaultZero(rs.getBigDecimal("pe")))
+                    .pb(defaultZero(rs.getBigDecimal("pb")))
+                    .peMin(defaultZero(rs.getBigDecimal("pe_min")))
+                    .peMax(defaultZero(rs.getBigDecimal("pe_max")))
+                    .peAvg(defaultZero(scale(rs.getBigDecimal("pe_avg"))))
+                    .pbMin(defaultZero(rs.getBigDecimal("pb_min")))
+                    .pbMax(defaultZero(rs.getBigDecimal("pb_max")))
+                    .pbAvg(defaultZero(scale(rs.getBigDecimal("pb_avg"))))
+                    .build();
+        }
     }
 
-    private StockHistoryDTO mapStockHistory(ResultSet rs) throws SQLException {
-        BigDecimal foreignBuyVol  = getBigDecimal(rs, "foreign_buy_volume");
-        BigDecimal foreignSellVol = getBigDecimal(rs, "foreign_sell_volume");
-        BigDecimal activeBuyValue  = getBigDecimal(rs, "matched_buy_value");
-        BigDecimal activeSellValue = getBigDecimal(rs, "matched_sell_value");
-        BigDecimal propBuy        = getBigDecimal(rs, "prop_buy_value");
-        BigDecimal propSell       = getBigDecimal(rs, "prop_sell_value");
-
-        return StockHistoryDTO.builder()
-                .symbol(rs.getString("symbol"))
-                .tradeDate(toLocalDate(rs, "trading_date"))
-                .openPrice(getBigDecimal(rs, "open"))
-                .highPrice(getBigDecimal(rs, "high"))
-                .lowPrice(getBigDecimal(rs, "low"))
-                .closePrice(getBigDecimal(rs, "close"))
-                .volume(getBigDecimal(rs, "volume"))
-                .turnover(getBigDecimal(rs, "turnover"))
-                .totalValue(getBigDecimal(rs, "volume"))
-                .buyOrderValue(getBigDecimal(rs, "buy_value"))
-                .sellOrderValue(getBigDecimal(rs, "sell_value"))
-                .avgBuyOrderVolume(getBigDecimal(rs, "avg_buy_order"))
-                .avgSellOrderVolume(getBigDecimal(rs, "avg_sell_order"))
-                .orderRatio(getDouble(rs, "ratio_sell_buy_order"))
-                .activeBuyValue(activeBuyValue)
-                .activeSellValue(activeSellValue)
-                .avgMatchedBuy(null)
-                .avgMatchedSell(null)
-                .matchedRatio(calculateRatio(activeSellValue, activeBuyValue))
-                .priceAdjustment1(null).priceAdjustment2(null)
-                .priceAdjustment3(null).priceAdjustment4(null)
-                .avgAdjustment1(null).avgAdjustment2(null)
-                .cancelBuyValue(getBigDecimal(rs, "cancel_buy_value"))
-                .cancelSellValue(getBigDecimal(rs, "cancel_sell_value"))
-                .avgCancelBuy(null).avgCancelSell(null)
-                .foreignBuyVol(foreignBuyVol)
-                .foreignSellVol(foreignSellVol)
-                .foreignNetVol(calculateNet(foreignBuyVol, foreignSellVol))
-                .propBuyVal(propBuy)
-                .propSellVal(propSell)
-                .propNetVal(calculateNet(propBuy, propSell))
-                .individualBuyVal(null).individualSellVal(null).individualNetVal(null)
-                .orgBuyVal(null).orgSellVal(null).orgNetVal(null)
-                .pe(getBigDecimal(rs, "pe_val"))
-                .pb(getBigDecimal(rs, "pb_val"))
-                .marketCap(null)
-                .closePrice(getBigDecimal(rs, "close"))
-                .build();
+    private static class PeerComparisonRowMapper implements RowMapper<PeerComparisonDTO> {
+        @Override
+        public PeerComparisonDTO mapRow(ResultSet rs, int rowNum) throws SQLException {
+            return PeerComparisonDTO.builder()
+                    .symbol(rs.getString("symbol"))
+                    .pe(defaultZero(rs.getBigDecimal("pe")))
+                    .pb(defaultZero(rs.getBigDecimal("pb")))
+                    .price(defaultZero(rs.getBigDecimal("close_price")))
+                    .build();
+        }
     }
 
-    // ---------------------------------------------------------------------------
-    // Private helpers — math / null-safe utilities
-    // ---------------------------------------------------------------------------
+    private static class ForeignTradingRowMapper implements RowMapper<ForeignTradingDTO> {
+        @Override
+        public ForeignTradingDTO mapRow(ResultSet rs, int rowNum) throws SQLException {
+            BigDecimal foreignBuy = defaultZero(rs.getBigDecimal("fr_buy_value"));
+            BigDecimal foreignSell = defaultZero(rs.getBigDecimal("fr_sell_value"));
+            BigDecimal propBuy = defaultZero(rs.getBigDecimal("prop_buy_value"));
+            BigDecimal propSell = defaultZero(rs.getBigDecimal("prop_sell_value"));
 
-    /**
-     * Normalizes a stock symbol: trim whitespace and convert to upper-case.
-     * Do this once in Java rather than calling UPPER(TRIM(...)) in SQL,
-     * which would prevent index usage on the column.
-     */
+            return ForeignTradingDTO.builder()
+                    .symbol(rs.getString("symbol"))
+                    .tradeDate(toLocalDate(rs, "trading_date"))
+                    .foreignBuy(foreignBuy)
+                    .foreignSell(foreignSell)
+                    .foreignNet(foreignBuy.subtract(foreignSell))
+                    .tdMua(propBuy)
+                    .tdBan(propSell)
+                    .tdRong(propBuy.subtract(propSell))
+                    .foreignBuyTong(foreignBuy)
+                    .foreignSellTong(foreignSell)
+                    .foreignNetTong(foreignBuy.subtract(foreignSell))
+                    .tdMuaTong(propBuy)
+                    .tdBanTong(propSell)
+                    .tdRongTong(propBuy.subtract(propSell))
+                    .build();
+        }
+    }
+
+    private static class IndustryFlowRowMapper implements RowMapper<IndustryFlowDTO> {
+        @Override
+        public IndustryFlowDTO mapRow(ResultSet rs, int rowNum) throws SQLException {
+            return IndustryFlowDTO.builder()
+                    .tradeDate(toLocalDate(rs, "trading_date"))
+                    .totalValue(defaultZero(rs.getBigDecimal("market_total_val")))
+                    .totalNH(defaultZero(rs.getBigDecimal("bank_total")))
+                    .muaNH(defaultZero(rs.getBigDecimal("bank_buy")))
+                    .banNH(defaultZero(rs.getBigDecimal("bank_sell")))
+                    .tiLeNH(defaultZero(rs.getBigDecimal("bank_ratio_pct")))
+                    .totalCK(defaultZero(rs.getBigDecimal("sec_total")))
+                    .muaCK(defaultZero(rs.getBigDecimal("sec_buy")))
+                    .banCK(defaultZero(rs.getBigDecimal("sec_sell")))
+                    .tiLeCK(defaultZero(rs.getBigDecimal("sec_ratio_pct")))
+                    .totalBDS(defaultZero(rs.getBigDecimal("re_total")))
+                    .muaBDS(defaultZero(rs.getBigDecimal("re_buy")))
+                    .banBDS(defaultZero(rs.getBigDecimal("re_sell")))
+                    .tiLeBDS(defaultZero(rs.getBigDecimal("re_ratio_pct")))
+                    .totalThep(defaultZero(rs.getBigDecimal("steel_total")))
+                    .muaThep(defaultZero(rs.getBigDecimal("steel_buy")))
+                    .banThep(defaultZero(rs.getBigDecimal("steel_sell")))
+                    .tiLeThep(defaultZero(rs.getBigDecimal("steel_ratio_pct")))
+                    .totalVIN(defaultZero(rs.getBigDecimal("vin_total")))
+                    .muaVIN(defaultZero(rs.getBigDecimal("vin_buy")))
+                    .banVIN(defaultZero(rs.getBigDecimal("vin_sell")))
+                    .tiLeVIN(defaultZero(rs.getBigDecimal("vin_ratio_pct")))
+                    .build();
+        }
+    }
+
+    private static class PredictionRowMapper implements RowMapper<PredictionResponse> {
+        @Override
+        public PredictionResponse mapRow(ResultSet rs, int rowNum) throws SQLException {
+            return PredictionResponse.builder()
+                    .symbol(rs.getString("symbol"))
+                    .predictDate(toLocalDate(rs, "predict_date"))
+                    .targetDate(toLocalDate(rs, "target_date"))
+                    .predictedClose(rs.getBigDecimal("predicted_close"))
+                    .actualClose(rs.getBigDecimal("actual_close"))
+                    .trend(rs.getString("trend"))
+                    .modelUsed(rs.getString("model_used"))
+                    .createdAt(toLocalDateTime(rs, "created_at"))
+                    .build();
+        }
+    }
+
+    private static class WyckoffRowMapper implements RowMapper<WyckoffAnalysisDTO> {
+        @Override
+        public WyckoffAnalysisDTO mapRow(ResultSet rs, int rowNum) throws SQLException {
+            return WyckoffAnalysisDTO.builder()
+                    .symbol(rs.getString("symbol"))
+                    .phase(rs.getString("phase"))
+                    .schematic(rs.getString("schematic"))
+                    .trLow(rs.getBigDecimal("tr_low"))
+                    .trHigh(rs.getBigDecimal("tr_high"))
+                    .lastClose(rs.getBigDecimal("last_close"))
+                    .lastDate(toLocalDate(rs, "last_date"))
+                    .riskReward(rs.getBigDecimal("risk_reward"))
+                    .dataJson(rs.getString("data_json"))
+                    .build();
+        }
+    }
+
     private static String normalize(String symbol) {
         return symbol == null ? null : symbol.trim().toUpperCase();
     }
@@ -651,8 +440,7 @@ public class TimescaleMarketRepository {
     }
 
     private static Double calculateRatio(BigDecimal numerator, BigDecimal denominator) {
-        if (numerator == null || denominator == null
-                || denominator.compareTo(BigDecimal.ZERO) == 0) {
+        if (numerator == null || denominator == null || denominator.compareTo(BigDecimal.ZERO) == 0) {
             return null;
         }
         return numerator.divide(denominator, 4, RoundingMode.HALF_UP).doubleValue();
@@ -660,10 +448,6 @@ public class TimescaleMarketRepository {
 
     private static BigDecimal scale(BigDecimal value) {
         return value == null ? null : value.setScale(2, RoundingMode.HALF_UP);
-    }
-
-    private static BigDecimal getBigDecimal(ResultSet rs, String column) throws SQLException {
-        return rs.getBigDecimal(column);
     }
 
     private static Double getDouble(ResultSet rs, String column) throws SQLException {
